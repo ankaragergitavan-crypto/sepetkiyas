@@ -32,6 +32,7 @@ const els = {
   scrim: document.getElementById("scrim"),
   cartPanels: document.getElementById("cartPanels"),
   cartWinner: document.getElementById("cartWinner"),
+  cartGroupTotals: document.getElementById("cartGroupTotals"),
   grandTotal: document.getElementById("grandTotal"),
   viewToggle: document.getElementById("viewToggle"),
   clearCarts: document.getElementById("clearCarts"),
@@ -257,6 +258,10 @@ function renderCarts() {
       els.cartWinner.hidden = true;
       els.cartWinner.innerHTML = "";
     }
+    if (els.cartGroupTotals) {
+      els.cartGroupTotals.hidden = true;
+      els.cartGroupTotals.innerHTML = "";
+    }
     els.cartPanels.innerHTML =
       '<p class="muted">Henüz ürün yok. Sonuçlardan “Sepete ekle” ile market bazlı sepet doldurun.</p>';
     return;
@@ -265,18 +270,40 @@ function renderCarts() {
   const totals = ids.map((marketId) => {
     const items = state.carts[marketId];
     const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-    return { marketId, total, items };
+    const qty = items.reduce((s, i) => s + i.qty, 0);
+    return { marketId, total, items, qty };
   });
   totals.sort((a, b) => a.total - b.total);
   const winner = totals[0];
   if (els.cartWinner) {
     const meta = marketMap[winner.marketId];
     els.cartWinner.hidden = false;
-    els.cartWinner.innerHTML = `En ucuz sepet: <strong>${escapeHtml(meta?.label || winner.marketId)}</strong> · ${money(winner.total)}`;
+    els.cartWinner.innerHTML = `En ucuz sepet grubu: <strong>${escapeHtml(meta?.label || winner.marketId)}</strong> · <strong>${money(winner.total)}</strong>`;
+  }
+
+  if (els.cartGroupTotals) {
+    els.cartGroupTotals.hidden = false;
+    els.cartGroupTotals.innerHTML = `
+      <h3 class="cart-groups-title">Market grupları · toplam tutarlar</h3>
+      <ul class="cart-groups-list">
+        ${totals
+          .map(({ marketId, total, qty }, i) => {
+            const meta = marketMap[marketId];
+            const cheapest = i === 0;
+            return `<li class="${cheapest ? "is-cheapest" : ""}">
+              <span class="market-badge"><i style="background:${meta?.color || "#999"}"></i>${escapeHtml(meta?.label || marketId)}</span>
+              <span class="muted tiny">${qty} ürün${cheapest ? " · en ucuz" : ""}</span>
+              <strong class="group-sum">${money(total)}</strong>
+            </li>`;
+          })
+          .join("")}
+      </ul>
+      <p class="muted tiny cart-groups-note">Her satır o market sepetinin kendi toplamıdır (karşılaştırma).</p>
+    `;
   }
 
   els.cartPanels.innerHTML = totals
-    .map(({ marketId, total, items }) => {
+    .map(({ marketId, total, items, qty }) => {
       const meta = marketMap[marketId];
       const isWin = marketId === winner.marketId;
       return `
@@ -284,9 +311,9 @@ function renderCarts() {
           <h3>
             <span class="market-badge">
               <i style="background:${meta?.color || "#999"}"></i>
-              ${meta?.label || marketId}${isWin ? " · en ucuz" : ""}
+              ${escapeHtml(meta?.label || marketId)}${isWin ? " · en ucuz" : ""}
             </span>
-            <span>${items.reduce((s, i) => s + i.qty, 0)} ürün</span>
+            <span>${qty} ürün</span>
           </h3>
           ${items
             .map(
@@ -294,17 +321,21 @@ function renderCarts() {
             <div class="cart-item">
               <div>
                 <div>${escapeHtml(item.title)}</div>
+                <div class="muted tiny">${money(item.price)} × ${item.qty}</div>
                 <div class="qty-row">
-                  <button class="qty-btn" data-market="${marketId}" data-id="${item.id}" data-delta="-1">−</button>
+                  <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="-1">−</button>
                   <span>${item.qty}</span>
-                  <button class="qty-btn" data-market="${marketId}" data-id="${item.id}" data-delta="1">+</button>
+                  <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="1">+</button>
                 </div>
               </div>
               <div class="line-total">${money(item.price * item.qty)}</div>
             </div>`
             )
             .join("")}
-          <div class="panel-total"><span>Sepet toplamı</span><span>${money(total)}</span></div>
+          <div class="panel-total">
+            <span>${escapeHtml(meta?.label || marketId)} sepet toplamı</span>
+            <strong>${money(total)}</strong>
+          </div>
         </section>`;
     })
     .join("");

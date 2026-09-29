@@ -565,6 +565,54 @@ main {
   color: var(--ink);
 }
 
+.cart-group-totals {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cart-groups-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cart-groups-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cart-groups-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.88rem;
+}
+
+.cart-groups-list li.is-cheapest {
+  color: var(--accent);
+}
+
+.cart-groups-list .group-sum {
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+  min-width: 5.5rem;
+  text-align: right;
+}
+
+.cart-groups-note {
+  margin: 0.45rem 0 0;
+}
+
 .cart-panel.winner {
   border-color: rgba(125, 255, 179, 0.4);
 }
@@ -1056,7 +1104,16 @@ main {
   border-top: 1px dashed var(--line);
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
   font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.panel-total strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-size: 1.05rem;
 }
 
 .drawer-foot {
