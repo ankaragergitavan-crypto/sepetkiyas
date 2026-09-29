@@ -85,6 +85,17 @@ function money(n) {
   }).format(n || 0);
 }
 
+function lowestPrice(offers) {
+  const prices = (offers || [])
+    .map((o) => Number(o.price))
+    .filter((p) => Number.isFinite(p) && p > 0);
+  return prices.length ? Math.min(...prices) : null;
+}
+
+function isBestPrice(o, best) {
+  return best != null && Number(o.price) === best;
+}
+
 function cartCount() {
   return Object.values(state.carts).reduce(
     (sum, items) => sum + items.reduce((s, i) => s + i.qty, 0),
@@ -408,8 +419,9 @@ function visibleGroups() {
     .filter((g) => g.offers.length);
 }
 
-function offerCardHtml(o, idx) {
+function offerCardHtml(o, idx, bestPrice = null) {
   const realIdx = state.offers.indexOf(o);
+  const best = isBestPrice(o, bestPrice);
   const img = o.imageUrl
     ? `<img src="${o.imageUrl}" alt="" loading="lazy" />`
     : `<div style="width:72px;height:72px;border-radius:12px;background:#0b140f"></div>`;
@@ -421,7 +433,7 @@ function offerCardHtml(o, idx) {
       ? `≈ ${Number(o.unitPriceEstimate).toFixed(0)} ₺/birim`
       : o.unitPrice || "";
   return `
-    <article class="offer ${o.valuePick ? "value-pick" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
+    <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
       ${img}
       <div>
         <p class="offer-title">${escapeHtml(o.title)}</p>
@@ -456,7 +468,8 @@ function offerCardHtml(o, idx) {
       </div>
       <div class="offer-side">
         <div class="price-wrap">
-          <div class="price">${money(o.price)}</div>
+          <div class="price ${best ? "best" : ""}">${money(o.price)}</div>
+          ${best ? `<span class="best-badge">En uygun</span>` : ""}
           ${trendBadge(o)}
         </div>
         <button class="add-btn" data-idx="${realIdx}">Sepete ekle</button>
@@ -465,21 +478,23 @@ function offerCardHtml(o, idx) {
 }
 
 function paintTable(offers) {
+  const best = lowestPrice(offers);
   const rows = offers
     .map((o) => {
       const realIdx = state.offers.indexOf(o);
+      const isBest = isBestPrice(o, best);
       const unit =
         o.unitPriceEstimate != null
           ? `${Number(o.unitPriceEstimate).toFixed(0)}`
           : o.unitPriceValue != null
             ? String(o.unitPriceValue)
             : "—";
-      return `<tr>
-        <td class="td-title">${escapeHtml(o.title)}${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}</td>
+      return `<tr class="${isBest ? "best-deal" : ""}">
+        <td class="td-title">${escapeHtml(o.title)}${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}</td>
         <td><span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
           ${o.depotName ? `<div class="muted tiny">${escapeHtml(o.depotName)}</div>` : ""}
         </td>
-        <td class="td-num">${money(o.price)}</td>
+        <td class="td-num td-price ${isBest ? "best" : ""}">${money(o.price)}</td>
         <td class="td-num">${escapeHtml(String(unit))}</td>
         <td class="td-num">${o.distanceKm != null ? o.distanceKm + " km" : "—"}</td>
         <td>${trendBadge(o) || "—"}</td>
@@ -506,13 +521,15 @@ function paintTable(offers) {
 function paintGrouped(groups) {
   return groups
     .map((g, gi) => {
+      const best = g.bestPrice != null ? Number(g.bestPrice) : lowestPrice(g.offers);
       const rows = g.offers
         .map((o) => {
           const realIdx = state.offers.indexOf(o);
-          return `<div class="group-row">
+          const isBest = isBestPrice(o, best);
+          return `<div class="group-row ${isBest ? "best-deal" : ""}">
             <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
-            <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}</span>
-            <strong>${money(o.price)}</strong>
+            <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}${isBest ? ` · En uygun` : ""}</span>
+            <span class="group-price ${isBest ? "best" : ""}">${money(o.price)}</span>
             <span class="muted tiny">${o.unitPriceEstimate != null ? `≈ ${Number(o.unitPriceEstimate).toFixed(0)} birim` : o.unitPrice || ""}</span>
             ${trendBadge(o)}
             <button class="add-btn compact" data-idx="${realIdx}">Ekle</button>
@@ -545,14 +562,15 @@ function paintOffers() {
     els.offerList.innerHTML = paintTable(offers);
     return;
   }
+  const best = lowestPrice(offers);
   if (state.viewMode === "grouped") {
     const groups = visibleGroups();
     els.offerList.innerHTML = groups.length
       ? paintGrouped(groups)
-      : offers.map((o, i) => offerCardHtml(o, i)).join("");
+      : offers.map((o, i) => offerCardHtml(o, i, best)).join("");
     return;
   }
-  els.offerList.innerHTML = offers.map((o, i) => offerCardHtml(o, i)).join("");
+  els.offerList.innerHTML = offers.map((o, i) => offerCardHtml(o, i, best)).join("");
 }
 
 function syncViewToggle() {
