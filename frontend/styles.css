@@ -153,7 +153,11 @@ main,
   font-family: var(--display);
   font-weight: 800;
   letter-spacing: -0.03em;
-  font-size: 1.25rem;
+  font-size: clamp(0.7rem, 2.2vw, 0.95rem);
+  max-width: min(62vw, 18rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-right {
@@ -259,9 +263,9 @@ main {
   margin: 0 0 0.6rem;
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(2.6rem, 8vw, 4.6rem);
-  letter-spacing: -0.05em;
-  line-height: 0.95;
+  font-size: clamp(1.55rem, 6.2vw, 3.4rem);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
   background: linear-gradient(120deg, #f3f7f2 20%, var(--accent) 70%, var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
@@ -270,7 +274,7 @@ main {
 
 .hero h1 {
   margin: 0;
-  max-width: 16ch;
+  max-width: 18ch;
   font-family: var(--display);
   font-size: clamp(1.35rem, 3.4vw, 2rem);
   font-weight: 700;

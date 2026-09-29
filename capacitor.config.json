@@ -1,6 +1,6 @@
 {
-  "appId": "tr.sepetkiyas.app",
-  "appName": "SepetKiyas",
+  "appId": "tr.agtmarket.app",
+  "appName": "AGT MARKET KARŞILAŞTIRMA",
   "webDir": "frontend",
   "server": {
     "androidScheme": "https",

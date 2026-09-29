@@ -164,7 +164,7 @@ function setupInstall() {
     els.installHint.hidden = false;
     els.installBtn.textContent = "Ana ekrana ekle";
     els.installBtn.onclick = () => {
-      alert("Safari’de Paylaş → Ana Ekrana Ekle ile SepetKıyas’ı yükleyebilirsiniz.");
+      alert("Safari’de Paylaş → Ana Ekrana Ekle ile AGT MARKET KARŞILAŞTIRMA’yı yükleyebilirsiniz.");
     };
   }
 }
@@ -918,16 +918,56 @@ els.quickQueries?.addEventListener("click", (e) => {
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  dismissKeyboard();
   await runSearch(els.query.value.trim());
 });
+
+function dismissKeyboard() {
+  const q = els.query;
+  if (!q) return;
+  try {
+    q.blur();
+    // iOS: readonly kısa süre klavyeyi zorla kapatır
+    q.setAttribute("readonly", "readonly");
+    q.setAttribute("inputmode", "none");
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+    els.searchBtn?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      els.searchBtn?.blur();
+      q.removeAttribute("readonly");
+      q.setAttribute("inputmode", "search");
+    });
+    setTimeout(() => {
+      q.removeAttribute("readonly");
+      q.setAttribute("inputmode", "search");
+      if (document.activeElement === q) q.blur();
+    }, 80);
+  } catch {
+    /* ignore */
+  }
+}
+
+els.query?.addEventListener("focus", () => {
+  // Arama kutusuna tıklanınca klavye tekrar açılsın
+  els.query.removeAttribute("readonly");
+  els.query.setAttribute("inputmode", "search");
+});
+
+els.query?.addEventListener("touchstart", () => {
+  els.query.removeAttribute("readonly");
+  els.query.setAttribute("inputmode", "search");
+}, { passive: true });
 
 async function runSearch(rawQuery, meta = {}) {
   const query = String(rawQuery || "").trim();
   if (!query) return;
   els.query.value = query;
+  dismissKeyboard();
   const city = selectedCity();
   els.searchBtn.disabled = true;
-  els.searchBtn.textContent = "Taranıyor…";
+  els.searchBtn.textContent = "Aranıyor…";
   setScanStatus(meta.status || `Aranıyor: ${query}`);
   try {
     const res = await fetch("/api/search", {
@@ -945,6 +985,9 @@ async function runSearch(rawQuery, meta = {}) {
     renderOffers(data);
     if (meta.note) setScanStatus(meta.note, false);
     else setScanStatus("", true);
+    dismissKeyboard();
+    const top = els.resultsSection?.offsetTop ?? 0;
+    window.scrollTo({ top: Math.max(0, top - 12), behavior: "smooth" });
   } catch (err) {
     els.emptyState.hidden = false;
     els.resultsSection.hidden = true;
@@ -952,7 +995,8 @@ async function runSearch(rawQuery, meta = {}) {
     setScanStatus(err.message || "Arama hatası", false);
   } finally {
     els.searchBtn.disabled = false;
-    els.searchBtn.textContent = "Karşılaştır";
+    els.searchBtn.textContent = "Ara";
+    dismissKeyboard();
     syncTimer();
   }
 }

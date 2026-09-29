@@ -45,7 +45,7 @@ class CartPDF(FPDF):
         self.set_y(-12)
         self.set_font("CartFont", size=8)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 8, f"SepetKıyas · sayfa {self.page_no()}/{{nb}}", align="C")
+        self.cell(0, 8, f"AGT MARKET KARŞILAŞTIRMA · sayfa {self.page_no()}/{{nb}}", align="C")
 
 
 def build_carts_pdf(payload: dict[str, Any]) -> bytes:
@@ -85,7 +85,7 @@ def build_carts_pdf(payload: dict[str, Any]) -> bytes:
 
     pdf.set_font("CartFont", "B", 18)
     pdf.set_text_color(15, 40, 28)
-    pdf.cell(0, 10, "SepetKıyas — Market Sepetleri", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "AGT MARKET KARŞILAŞTIRMA — Sepetler", new_x="LMARGIN", new_y="NEXT")
 
     pdf.set_font("CartFont", size=10)
     pdf.set_text_color(60, 60, 60)
@@ -184,7 +184,7 @@ def build_carts_pdf(payload: dict[str, Any]) -> bytes:
         0,
         4,
         "Not: Fiyatlar PDF oluşturulduğu andaki canlı kayıtlara aittir. "
-        "Market API’si stok garantisi vermez. SepetKıyas tıbbi tavsiye sunmaz.",
+        "Market API’si stok garantisi vermez. AGT MARKET KARŞILAŞTIRMA tıbbi tavsiye sunmaz.",
     )
 
     out = io.BytesIO()

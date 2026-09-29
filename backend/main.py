@@ -83,7 +83,7 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app = FastAPI(title="SepetKıyas", version="1.3.0")
+app = FastAPI(title="AGT MARKET KARŞILAŞTIRMA", version="1.4.0")
 
 app.add_middleware(ActivityMiddleware)
 app.add_middleware(
