@@ -1,0 +1,17 @@
+{
+  "appId": "tr.sepetkiyas.app",
+  "appName": "SepetKiyas",
+  "webDir": "frontend",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "url": "http://127.0.0.1:8000",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#0f1a14"
+    }
+  }
+}

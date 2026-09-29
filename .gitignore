@@ -1,0 +1,17 @@
+# SepetKıyas
+*.pyc
+__pycache__/
+.venv/
+venv/
+.env
+.env.*
+sample_response.json
+_bim_sample.html
+_getir_sample.json
+.DS_Store
+.idea/
+.vscode/
+tools/
+*.zip
+*.exe
+wintun.dll

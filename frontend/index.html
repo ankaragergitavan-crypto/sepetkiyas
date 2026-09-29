@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f1a14" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="SepetKıyas — A101, Migros, Şok, BİM, Tarım Kredi canlı fiyat karşılaştırma. Android, iOS ve PC."
+    />
+    <meta name="application-name" content="SepetKıyas" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SepetKıyas" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+    <title>SepetKıyas — Market Fiyat Karşılaştırma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="SepetKıyas ana sayfa">
+        <span class="brand-mark">SK</span>
+        <span class="brand-text">SepetKıyas</span>
+      </a>
+      <button type="button" class="cart-toggle" id="cartToggle" aria-expanded="false">
+        Sepetler
+        <span class="cart-badge" id="cartBadge">0</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="hero-brand">SepetKıyas</p>
+        <h1>Aynı ürün, altı market, canlı fiyat.</h1>
+        <p class="hero-sub">
+          A101, Migros, Şok, Tarım Kredi, BİM ve Getir’de ara (yalnızca
+          <strong>Ankara</strong>). En ucuzdan pahalıya sırala; her market için ayrı sepet tut.
+        </p>
+
+        <form class="search-panel" id="searchForm">
+          <label class="sr-only" for="query">Ürün adı</label>
+          <input
+            id="query"
+            name="query"
+            type="search"
+            enterkeyhint="search"
+            inputmode="search"
+            placeholder="Örn. süt, yumurta, kaşar 500 g…"
+            autocomplete="off"
+            required
+          />
+          <label class="sr-only" for="city">Konum</label>
+          <select id="city" name="city"></select>
+          <button type="submit" id="searchBtn">Karşılaştır</button>
+        </form>
+
+        <div class="market-chips" id="marketChips"></div>
+        <div class="desktop-actions">
+          <button type="button" class="ghost-btn" id="desktopBtn">Masaüstüne kısayol ekle</button>
+          <a class="ghost-btn linkish" id="downloadUrlBtn" href="/api/desktop-shortcut">.url indir</a>
+          <span class="muted" id="desktopMsg"></span>
+        </div>
+        <p class="install-hint" id="installHint" hidden>
+          <button type="button" class="ghost-btn" id="installBtn">Uygulamayı yükle</button>
+          <span class="muted">Ana ekrana ekle — Android / iOS / PC</span>
+        </p>
+      </section>
+
+      <section class="results" id="resultsSection" hidden>
+        <div class="results-head">
+          <div>
+            <h2 id="resultsTitle">Sonuçlar</h2>
+            <p class="muted" id="resultsMeta"></p>
+          </div>
+          <div class="sort-note">Sıralama: <strong>en ucuz → en pahalı</strong></div>
+        </div>
+        <div class="volume-row" id="volumeRow" hidden></div>
+        <div class="status-row" id="statusRow"></div>
+        <div class="offer-list" id="offerList"></div>
+      </section>
+
+      <section class="empty" id="emptyState">
+        <p>Bir ürün yazıp canlı fiyatlara bakın. Fiyatlar konumdaki yakın şubelerden gelir.</p>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Alt menü">
+      <button type="button" class="tab active" data-tab="search" id="tabSearch">
+        <span>Ara</span>
+      </button>
+      <button type="button" class="tab" data-tab="cart" id="tabCart">
+        <span>Sepetler</span>
+        <span class="tab-badge" id="tabCartBadge">0</span>
+      </button>
+    </nav>
+
+    <aside class="drawer" id="cartDrawer" aria-hidden="true">
+      <div class="drawer-head">
+        <h2>Market sepetleri</h2>
+        <button type="button" class="icon-btn" id="closeCart" aria-label="Kapat">×</button>
+      </div>
+      <p class="muted drawer-hint">
+        Ürün hangi markette seçildiyse o marketin sepetine eklenir. Sepetler ayrı tutulur.
+      </p>
+      <div id="cartPanels"></div>
+      <div class="drawer-foot">
+        <div class="grand">
+          <span>Tüm sepetler toplamı</span>
+          <strong id="grandTotal">0,00 ₺</strong>
+        </div>
+        <button type="button" class="ghost-btn" id="clearCarts">Tüm sepetleri temizle</button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>
