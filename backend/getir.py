@@ -139,14 +139,26 @@ async def search_getir_carsi(
 
     offers.sort(key=lambda o: (-o.get("relevance", 0), o["price"], o["title"]))
     offers = offers[:limit]
+    if offers:
+        note = (
+            "Getir Büyük depo API’si giriş ister. "
+            "Bunun yerine Getir Çarşı üzerinden konumundaki Getir ağı fiyatları çekildi."
+        )
+    elif shops:
+        note = (
+            "Getir Çarşı bu konumda açık ama aranan ürüne canlı eşleşme yok "
+            "(sahte fiyat eklenmedi)."
+        )
+    else:
+        note = (
+            "Getir Çarşı bu konumda şu an canlı ürün döndürmedi "
+            "(bölge/kapasite). Sahte fiyat eklenmedi; diğer marketler canlı."
+        )
     return {
         "available": bool(offers),
         "channel": "getir_carsi",
         "channelLabel": "Getir Çarşı (konumlu yerel marketler)",
-        "note": (
-            "Getir Büyük depo API’si giriş ister. "
-            "Bunun yerine Getir Çarşı üzerinden konumundaki Getir ağı fiyatları çekildi."
-        ),
+        "note": note,
         "offerCount": len(offers),
         "offers": offers,
         "shopCount": len(shops),

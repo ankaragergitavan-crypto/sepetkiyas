@@ -23,7 +23,7 @@ from .markets import (
     MARKETS,
     clamp_to_ankara,
 )
-from .relevance import is_relevant, relevance_score
+from .relevance import is_relevant, relevance_score, split_query_tokens, qty_matches_offer
 from .grouping import build_product_groups, sort_offers_by_unit_price
 from .robot import annotate_offers, build_robot_pick
 from .price_trend import apply_price_trends
@@ -189,11 +189,17 @@ async def search(body: SearchBody) -> dict[str, Any]:
 
     for offer in result["offers"]:
         offer["volume"] = normalize_volume_label(offer.get("volume")) or offer.get("volume")
-        offer["relevance"] = relevance_score(offer.get("title") or "", query)
+        offer["relevance"] = relevance_score(
+            offer.get("title") or "",
+            query,
+            volume=offer.get("volume"),
+        )
 
     # Alakasız teklifleri ele (ör. kaşar peynir → peynirli kraker)
     result["offers"] = [
-        o for o in result["offers"] if is_relevant(o.get("title") or "", query, min_score=4)
+        o
+        for o in result["offers"]
+        if is_relevant(o.get("title") or "", query, min_score=4, volume=o.get("volume"))
     ]
 
     getir_status: dict[str, Any] | None = None
@@ -218,7 +224,12 @@ async def search(body: SearchBody) -> dict[str, Any]:
             result["offers"] = [
                 o
                 for o in result["offers"]
-                if is_relevant(o.get("title") or "", query, min_score=4)
+                if is_relevant(
+                    o.get("title") or "",
+                    query,
+                    min_score=4,
+                    volume=o.get("volume"),
+                )
             ]
         except Exception as exc:  # noqa: BLE001
             getir_status = {
@@ -227,6 +238,17 @@ async def search(body: SearchBody) -> dict[str, Any]:
                 "note": f"Getir araması başarısız: {exc}",
                 "offerCount": 0,
             }
+
+    # Sorguda "1L" / "500g" varsa ve eşleşen canlı teklif varsa yalnızca onları tut
+    _, soft_qty = split_query_tokens(query)
+    if soft_qty:
+        matched = [
+            o
+            for o in result["offers"]
+            if qty_matches_offer(o.get("title") or "", o.get("volume"), soft_qty)
+        ]
+        if matched:
+            result["offers"] = matched
 
     by_market: dict[str, int] = {}
     for offer in result["offers"]:

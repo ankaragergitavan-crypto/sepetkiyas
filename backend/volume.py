@@ -51,6 +51,9 @@ def volume_sort_key(label: str | None) -> tuple[float, str]:
         return (10**9, label)
     n = float(m.group(1))
     unit = m.group(2) or ""
+    if unit == "ADET":
+        # Adet kütle değil — birim fiyat hesabına sokma
+        return (10**9, label)
     grams = n
     if unit == "KG":
         grams = n * 1000
@@ -58,7 +61,18 @@ def volume_sort_key(label: str | None) -> tuple[float, str]:
         grams = n * 1000
     elif unit == "ML":
         grams = n
+    elif unit == "":
+        return (10**9, label)
     return (grams, label)
+
+
+def parse_adet_count(volume: str | None, title: str | None = None) -> int | None:
+    blob = f"{volume or ''} {title or ''}"
+    m = re.search(r"(\d+)\s*(?:adet|['’]?li|['’]?lı|['’]?lu|['’]?lü)\b", blob, re.I)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return n if n > 0 else None
 
 
 def extract_volume_options(offers: list[dict[str, Any]]) -> list[str]:

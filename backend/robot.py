@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from .relevance import fold_tr
-from .volume import normalize_volume_label, volume_sort_key
+from .volume import normalize_volume_label, parse_adet_count, volume_sort_key
 
 # Tüm ürünler için kaynak metni sinyalleri (başlık/kategori/marka). Lab skoru değil.
 _LABEL_PLUS = [
@@ -63,14 +63,27 @@ _UNIT_RE = re.compile(
 
 
 def _parse_unit_price(offer: dict[str, Any]) -> float | None:
-    """Önce gramajdan hesapla (daha güvenilir); yoksa unitPrice metni."""
-    vol = normalize_volume_label(offer.get("volume"))
+    """kg/L için ₺/kg(L); adet için ₺/adet. Adeti gram sanma."""
     price = offer.get("price")
-    if vol and price is not None:
+    if price is None:
+        return None
+    try:
+        price_f = float(price)
+    except (TypeError, ValueError):
+        return None
+    if price_f <= 0:
+        return None
+
+    adet = parse_adet_count(offer.get("volume"), offer.get("title"))
+    if adet:
+        return price_f / adet
+
+    vol = normalize_volume_label(offer.get("volume"))
+    if vol:
         grams, _ = volume_sort_key(vol)
         if 0 < grams < 10**8:
             try:
-                return float(price) / (grams / 1000.0)
+                return price_f / (grams / 1000.0)
             except (TypeError, ValueError, ZeroDivisionError):
                 pass
 
