@@ -540,6 +540,64 @@ main {
   width: 100%;
 }
 
+.value-badge {
+  display: inline-block;
+  margin: 0.25rem 0 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #062015;
+  background: linear-gradient(90deg, #7dffb3, #ffc857);
+}
+
+.offer.value-pick {
+  border-color: rgba(125, 255, 179, 0.35);
+  box-shadow: 0 0 0 1px rgba(125, 255, 179, 0.12);
+}
+
+.score-bars {
+  display: grid;
+  gap: 0.28rem;
+  margin-top: 0.55rem;
+  max-width: 16rem;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 1.6rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.score-label {
+  letter-spacing: 0.02em;
+}
+
+.bar-track {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  min-width: 2px;
+}
+
+.score-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+  opacity: 0.85;
+}
+
 .offer {
   display: grid;
   grid-template-columns: 72px 1fr auto;

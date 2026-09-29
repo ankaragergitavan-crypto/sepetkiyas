@@ -332,6 +332,17 @@ function renderVolumeChips(options) {
     .join("");
 }
 
+function scoreRow(label, score) {
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const hue = Math.round((s / 100) * 120);
+  return `
+    <div class="score-row">
+      <span class="score-label">${label}</span>
+      <div class="bar-track"><i style="width:${s}%;background:hsl(${hue} 75% 48%)"></i></div>
+      <span class="score-num">${s}</span>
+    </div>`;
+}
+
 function paintOffers() {
   const offers = visibleOffers();
   if (!offers.length) {
@@ -346,11 +357,15 @@ function paintOffers() {
       const img = o.imageUrl
         ? `<img src="${o.imageUrl}" alt="" loading="lazy" />`
         : `<div style="width:72px;height:72px;border-radius:12px;background:#0b140f"></div>`;
+      const valueBadge = o.valuePick
+        ? `<span class="value-badge">Uygun fiyat + kaliteli</span>`
+        : "";
       return `
-        <article class="offer" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
+        <article class="offer ${o.valuePick ? "value-pick" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
           ${img}
           <div>
             <p class="offer-title">${escapeHtml(o.title)}</p>
+            ${valueBadge}
             <div class="offer-meta">
               <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
               ${o.brand ? `<span>${escapeHtml(o.brand)}</span>` : ""}
@@ -358,6 +373,10 @@ function paintOffers() {
               ${o.depotName ? `<span>${escapeHtml(o.depotName)}</span>` : ""}
               ${o.unitPrice ? `<span>${escapeHtml(o.unitPrice)}</span>` : ""}
               ${o.updatedAt ? `<span>güncelleme ${escapeHtml(o.updatedAt)}</span>` : ""}
+            </div>
+            <div class="score-bars" title="Tahmini skorlar — tıbbi tavsiye değildir">
+              ${scoreRow("Sağlık", o.healthScore)}
+              ${scoreRow("Fiyat", o.economyScore)}
             </div>
           </div>
           <div class="offer-side">
