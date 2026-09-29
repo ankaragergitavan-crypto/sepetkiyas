@@ -7,6 +7,7 @@ const state = {
   activeVolume: "all",
   viewMode: "grouped",
   carts: loadCarts(),
+  missingItems: [],
   deferredPrompt: null,
 };
 
@@ -46,6 +47,15 @@ const els = {
   scanModal: document.getElementById("scanModal"),
   closeScanModal: document.getElementById("closeScanModal"),
   scanLiveStatus: document.getElementById("scanLiveStatus"),
+  listText: document.getElementById("listText"),
+  listScanBtn: document.getElementById("listScanBtn"),
+  listCameraBtn: document.getElementById("listCameraBtn"),
+  listGalleryBtn: document.getElementById("listGalleryBtn"),
+  listFileInput: document.getElementById("listFileInput"),
+  listGalleryInput: document.getElementById("listGalleryInput"),
+  listScanStatus: document.getElementById("listScanStatus"),
+  missingSection: document.getElementById("missingSection"),
+  missingList: document.getElementById("missingList"),
   installHint: document.getElementById("installHint"),
   installBtn: document.getElementById("installBtn"),
   desktopBtn: document.getElementById("desktopBtn"),
@@ -132,7 +142,22 @@ function cartGrandTotal() {
 }
 
 function selectedCity() {
-  return state.cities.find((c) => c.id === els.city.value) || state.cities[0];
+  const fallback = { id: "ankara-cankaya", label: "Ankara · Çankaya", lat: 39.9208, lon: 32.8541 };
+  if (!state.cities?.length) return fallback;
+  return state.cities.find((c) => c.id === els.city?.value) || state.cities[0] || fallback;
+}
+
+function dismissKeyboard() {
+  const q = els.query;
+  if (!q) return;
+  try {
+    q.blur();
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function registerPwa() {
@@ -183,35 +208,52 @@ async function boot() {
     els.query.focus();
   }
 
-  const res = await fetch("/api/markets");
-  const data = await res.json();
-  state.markets = data.markets;
-  state.cities = data.cities;
+  try {
+    const res = await fetch("/api/markets");
+    const data = await res.json();
+    state.markets = data.markets || [];
+    state.cities = data.cities || [];
+    if (els.quickQueries) {
+      const qs = data.quickQueries || [];
+      els.quickQueries.innerHTML = qs
+        .map(
+          (q) =>
+            `<button type="button" class="quick-chip" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`
+        )
+        .join("");
+    }
+  } catch (err) {
+    console.error(err);
+    state.markets = state.markets || [];
+    state.cities = [
+      { id: "ankara-kecioren", label: "Ankara · Keçiören", lat: 39.9777, lon: 32.867 },
+      { id: "ankara-cankaya", label: "Ankara · Çankaya", lat: 39.9208, lon: 32.8541 },
+      { id: "ankara-yenimahalle", label: "Ankara · Yenimahalle", lat: 39.9667, lon: 32.8111 },
+      { id: "ankara-mamak", label: "Ankara · Mamak", lat: 39.92, lon: 32.91 },
+      { id: "ankara-etimesgut", label: "Ankara · Etimesgut", lat: 39.95, lon: 32.67 },
+      { id: "ankara-sincan", label: "Ankara · Sincan", lat: 39.966, lon: 32.58 },
+      { id: "ankara-pursaklar", label: "Ankara · Pursaklar", lat: 40.04, lon: 32.9 },
+    ];
+  }
 
-  els.city.innerHTML = state.cities
-    .map((c) => `<option value="${c.id}">${c.label}</option>`)
-    .join("");
-
-  if (els.quickQueries) {
-    const qs = data.quickQueries || [];
-    els.quickQueries.innerHTML = qs
-      .map(
-        (q) =>
-          `<button type="button" class="quick-chip" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`
-      )
+  if (els.city) {
+    els.city.innerHTML = (state.cities || [])
+      .map((c) => `<option value="${c.id}">${c.label}</option>`)
       .join("");
   }
 
-  els.chips.innerHTML = state.markets
-    .map(
-      (m) => `
+  if (els.chips) {
+    els.chips.innerHTML = (state.markets || [])
+      .map(
+        (m) => `
       <span class="chip ${m.live ? "live" : ""}" title="${escapeHtml(m.hint || "")}">
         <span class="dot" style="background:${m.color}"></span>
         ${m.label}
         <span class="tag">${m.live ? "canlı" : "bekleniyor"}</span>
       </span>`
-    )
-    .join("");
+      )
+      .join("");
+  }
 
   renderCarts();
 }
@@ -225,7 +267,7 @@ function openDrawer(open) {
   els.tabCart.classList.toggle("active", open);
 }
 
-function addToCart(offer) {
+function addToCart(offer, meta = {}) {
   const key = offer.marketId;
   if (!state.carts[key]) state.carts[key] = [];
   const existing = state.carts[key].find((i) => i.id === offer.id);
@@ -239,11 +281,16 @@ function addToCart(offer) {
       marketLabel: offer.marketLabel,
       imageUrl: offer.imageUrl,
       qty: 1,
+      listItem: meta.listItem || null,
+      matchType: meta.matchType || null,
+      similarNote: meta.similarNote || null,
+      volume: offer.volume || null,
+      brand: offer.brand || null,
     });
   }
   saveCarts();
   renderCarts();
-  openDrawer(true);
+  if (meta.openDrawer !== false) openDrawer(true);
 }
 
 function changeQty(marketId, itemId, delta) {
@@ -359,7 +406,13 @@ function renderCarts() {
             <div class="cart-item">
               <div>
                 <div>${escapeHtml(item.title)}</div>
-                <div class="muted tiny">${money(item.price)} × ${item.qty}</div>
+                <div class="muted tiny">${money(item.price)} × ${item.qty}${item.volume ? ` · ${escapeHtml(item.volume)}` : ""}</div>
+                ${
+                  item.listItem
+                    ? `<div class="muted tiny">Liste: ${escapeHtml(item.listItem)}${item.matchType === "similar" ? " · benzer" : " · aynı"}</div>`
+                    : ""
+                }
+                ${item.similarNote ? `<div class="similar-note">${escapeHtml(item.similarNote)}</div>` : ""}
                 <div class="cart-item-actions">
                   <div class="qty-row">
                     <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="-1" aria-label="Azalt">−</button>
@@ -871,7 +924,11 @@ function renderOffers(payload) {
   els.emptyState.hidden = true;
   els.resultsSection.hidden = false;
   els.resultsTitle.textContent = `“${payload.query}” sonuçları`;
-  els.resultsMeta.textContent = `${payload.offerCount} canlı teklif · ${payload.source} · ${payload.location.distance} km · sıra: birim fiyat`;
+  let meta = `${payload.offerCount} canlı teklif · ${payload.source} · ${payload.location.distance} km · sıra: birim fiyat`;
+  if (payload.typoCorrected && payload.originalQuery && payload.originalQuery !== payload.query) {
+    meta = `“${payload.originalQuery}” → “${payload.query}” · ` + meta;
+  }
+  els.resultsMeta.textContent = meta;
 
   const pills = Object.entries(payload.byMarket || {}).map(([id, count]) => {
     const m = state.markets.find((x) => x.id === id);
@@ -922,35 +979,7 @@ els.form.addEventListener("submit", async (e) => {
   await runSearch(els.query.value.trim());
 });
 
-function dismissKeyboard() {
-  const q = els.query;
-  if (!q) return;
-  try {
-    q.blur();
-    // iOS: readonly kısa süre klavyeyi zorla kapatır
-    q.setAttribute("readonly", "readonly");
-    q.setAttribute("inputmode", "none");
-    if (document.activeElement && document.activeElement !== document.body) {
-      document.activeElement.blur();
-    }
-    els.searchBtn?.focus({ preventScroll: true });
-    requestAnimationFrame(() => {
-      els.searchBtn?.blur();
-      q.removeAttribute("readonly");
-      q.setAttribute("inputmode", "search");
-    });
-    setTimeout(() => {
-      q.removeAttribute("readonly");
-      q.setAttribute("inputmode", "search");
-      if (document.activeElement === q) q.blur();
-    }, 80);
-  } catch {
-    /* ignore */
-  }
-}
-
 els.query?.addEventListener("focus", () => {
-  // Arama kutusuna tıklanınca klavye tekrar açılsın
   els.query.removeAttribute("readonly");
   els.query.setAttribute("inputmode", "search");
 });
@@ -966,9 +995,13 @@ async function runSearch(rawQuery, meta = {}) {
   els.query.value = query;
   dismissKeyboard();
   const city = selectedCity();
+  if (!city?.lat || !city?.lon) {
+    setScanStatus("İlçe seçilemedi — sayfayı yenileyin.", false);
+    return;
+  }
   els.searchBtn.disabled = true;
   els.searchBtn.textContent = "Aranıyor…";
-  setScanStatus(meta.status || `Aranıyor: ${query}`);
+  setScanStatus(meta.status || `Tüm marketlerde aranıyor: ${query}`);
   try {
     const res = await fetch("/api/search", {
       method: "POST",
@@ -977,13 +1010,17 @@ async function runSearch(rawQuery, meta = {}) {
         query,
         latitude: city.lat,
         longitude: city.lon,
-        distance: 10,
+        distance: 12,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Arama başarısız");
+    if (data.query && data.query !== query) {
+      els.query.value = data.query;
+    }
     renderOffers(data);
     if (meta.note) setScanStatus(meta.note, false);
+    else if (data.typoNote) setScanStatus(data.typoNote, false);
     else setScanStatus("", true);
     dismissKeyboard();
     const top = els.resultsSection?.offsetTop ?? 0;
@@ -995,7 +1032,7 @@ async function runSearch(rawQuery, meta = {}) {
     setScanStatus(err.message || "Arama hatası", false);
   } finally {
     els.searchBtn.disabled = false;
-    els.searchBtn.textContent = "Ara";
+    els.searchBtn.textContent = "Ara / Karşılaştır";
     dismissKeyboard();
     syncTimer();
   }
@@ -1256,6 +1293,177 @@ els.scanFileInput?.addEventListener("change", (e) => {
 els.scanGalleryInput?.addEventListener("change", (e) => {
   const file = e.target.files?.[0];
   if (file) processScanFile(file);
+});
+
+function setListStatus(text, hide = false) {
+  if (!els.listScanStatus) return;
+  if (hide) {
+    els.listScanStatus.hidden = true;
+    els.listScanStatus.textContent = "";
+    return;
+  }
+  els.listScanStatus.hidden = false;
+  els.listScanStatus.textContent = text;
+}
+
+function renderMissing(items) {
+  state.missingItems = items || [];
+  if (!els.missingSection || !els.missingList) return;
+  if (!state.missingItems.length) {
+    els.missingSection.hidden = true;
+    els.missingList.innerHTML = "";
+    return;
+  }
+  els.missingSection.hidden = false;
+  els.missingList.innerHTML = state.missingItems
+    .map((row, idx) => {
+      const sims = row.similars || [];
+      return `
+      <article class="missing-card" data-missing-idx="${idx}">
+        <div class="missing-head">
+          <strong>${escapeHtml(row.listItem || row.query || "—")}</strong>
+          <span class="muted tiny">${escapeHtml(row.reason || "Bulunamadı")}</span>
+        </div>
+        ${
+          sims.length
+            ? `<div class="missing-sims">
+                <p class="muted tiny">Benzer öneriler:</p>
+                ${sims
+                  .map(
+                    (s, si) => `
+                  <div class="missing-sim-row">
+                    <div>
+                      <div>${escapeHtml(s.title || "")}</div>
+                      <div class="muted tiny">${escapeHtml(s.marketLabel || "")} · ${money(s.price)}${s.volume ? ` · ${escapeHtml(s.volume)}` : ""}${s.brand ? ` · ${escapeHtml(s.brand)}` : ""}</div>
+                      <div class="similar-note">Benzeri: aranan “${escapeHtml(row.listItem || row.query)}”</div>
+                    </div>
+                    <button type="button" class="add-btn" data-missing-idx="${idx}" data-sim-idx="${si}">İstersen ekle</button>
+                  </div>`
+                  )
+                  .join("")}
+              </div>`
+            : `<p class="muted tiny">Benzer aday da yok.</p>`
+        }
+      </article>`;
+    })
+    .join("");
+}
+
+async function runListScan(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text) {
+    setListStatus("Liste boş — satır yazın veya fotoğraf yükleyin.", false);
+    return;
+  }
+  const city = selectedCity();
+  if (els.listScanBtn) {
+    els.listScanBtn.disabled = true;
+    els.listScanBtn.textContent = "Taranıyor…";
+  }
+  setListStatus("Liste taranıyor (marka + kg + en ucuz)…");
+  dismissKeyboard();
+  try {
+    const res = await fetch("/api/list-scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        latitude: city.lat,
+        longitude: city.lon,
+        distance: 12,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Liste taraması başarısız");
+
+    let added = 0;
+    for (const row of data.matched || []) {
+      const offer = row.offer;
+      if (!offer) continue;
+      addToCart(offer, {
+        listItem: row.listItem,
+        matchType: row.matchType,
+        similarNote: row.similarNote,
+        openDrawer: false,
+      });
+      added += 1;
+    }
+    renderMissing(data.unmatched || []);
+    renderCarts();
+    if (added) openDrawer(true);
+    els.emptyState.hidden = true;
+    setListStatus(
+      `${data.matchedCount}/${data.itemCount} sepete eklendi · ${data.unmatchedCount} bulunamayan` +
+        (data.note ? ` · ${data.note}` : ""),
+      false
+    );
+    if (els.listText && data.lines) {
+      els.listText.value = (data.lines || []).join("\n");
+    }
+  } catch (err) {
+    setListStatus(err.message || "Liste hatası", false);
+  } finally {
+    if (els.listScanBtn) {
+      els.listScanBtn.disabled = false;
+      els.listScanBtn.textContent = "Listeyi tara ve sepetlere ekle";
+    }
+  }
+}
+
+async function ocrListImage(file) {
+  if (!file) return;
+  setListStatus("Liste fotoğrafı okunuyor (OCR)…");
+  const Tesseract = await ensureTesseract();
+  const result = await Tesseract.recognize(file, "tur+eng", {
+    logger: (m) => {
+      if (m.status === "recognizing text" && els.listScanStatus) {
+        const pct = Math.round((m.progress || 0) * 100);
+        els.listScanStatus.hidden = false;
+        els.listScanStatus.textContent = `Liste okunuyor… %${pct}`;
+      }
+    },
+  });
+  const text = (result?.data?.text || "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/[^\wğüşıöçĞÜŞİÖÇ\s.\-%/]/gi, " ").trim())
+    .filter((l) => l.length >= 2)
+    .join("\n");
+  if (!text) {
+    setListStatus("Fotoğraftan liste okunamadı. Daha net çekin veya elle yazın.", false);
+    return;
+  }
+  if (els.listText) els.listText.value = text;
+  await runListScan(text);
+}
+
+els.listScanBtn?.addEventListener("click", () => runListScan(els.listText?.value || ""));
+els.listCameraBtn?.addEventListener("click", () => els.listFileInput?.click());
+els.listGalleryBtn?.addEventListener("click", () => els.listGalleryInput?.click());
+els.listFileInput?.addEventListener("change", (e) => {
+  const f = e.target.files?.[0];
+  if (f) ocrListImage(f);
+  e.target.value = "";
+});
+els.listGalleryInput?.addEventListener("change", (e) => {
+  const f = e.target.files?.[0];
+  if (f) ocrListImage(f);
+  e.target.value = "";
+});
+
+els.missingList?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-missing-idx][data-sim-idx]");
+  if (!btn) return;
+  const mi = Number(btn.dataset.missingIdx);
+  const si = Number(btn.dataset.simIdx);
+  const row = state.missingItems[mi];
+  const offer = row?.similars?.[si];
+  if (!offer) return;
+  addToCart(offer, {
+    listItem: row.listItem,
+    matchType: "similar",
+    similarNote: `Benzeri: aranan “${row.listItem || row.query}”`,
+  });
+  setListStatus(`Benzer eklendi: ${offer.title}`, false);
 });
 
 els.closeScanModal?.addEventListener("click", () => stopLiveScanner());

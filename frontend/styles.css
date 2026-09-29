@@ -244,7 +244,7 @@ main {
 }
 
 .hero {
-  padding: 1.5rem 0 2rem;
+  padding: 0.85rem 0 1.1rem;
   animation: rise 0.7s ease both;
 }
 
@@ -260,16 +260,18 @@ main {
 }
 
 .hero-brand {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.35rem;
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(1.55rem, 6.2vw, 3.4rem);
+  font-size: clamp(1.2rem, 5vw, 2.2rem);
   letter-spacing: -0.04em;
   line-height: 1.05;
   background: linear-gradient(120deg, #f3f7f2 20%, var(--accent) 70%, var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .hero h1 {
@@ -283,11 +285,11 @@ main {
 }
 
 .hero-sub {
-  margin: 0.9rem 0 1.5rem;
+  margin: 0.55rem 0 1rem;
   max-width: min(42rem, 100%);
   color: var(--muted);
-  font-size: clamp(0.92rem, 2.4vw, 1.02rem);
-  line-height: 1.55;
+  font-size: clamp(0.85rem, 2.2vw, 0.98rem);
+  line-height: 1.45;
 }
 
 .search-panel {
@@ -315,6 +317,25 @@ main {
   font: inherit;
   font-size: 16px; /* iOS zoom önleme */
   outline: none;
+}
+
+.city-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.city-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-left: 0.2rem;
+}
+
+.city-field select {
+  min-height: 2.85rem;
 }
 
 .search-panel input:focus,
@@ -347,6 +368,123 @@ main {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0.75rem 0 0.25rem;
+}
+
+.scan-btn,
+.primary-btn {
+  min-height: var(--touch);
+  padding: 0.65rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--accent), #3fd98a);
+  color: #062015;
+  border-color: transparent;
+  font-weight: 750;
+}
+
+.scan-btn:hover,
+.primary-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.list-panel {
+  margin: 1rem 0 0.5rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.list-panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.list-panel-hint {
+  margin: 0 0 0.65rem;
+  line-height: 1.45;
+}
+
+.list-panel textarea {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--ink);
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.similar-note {
+  margin-top: 0.2rem;
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.missing-section {
+  margin: 1.25rem 0 2rem;
+  padding: 0.9rem;
+  border: 1px dashed rgba(255, 107, 107, 0.45);
+  border-radius: var(--radius);
+  background: rgba(255, 107, 107, 0.06);
+}
+
+.missing-section h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.missing-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.missing-card {
+  padding: 0.75rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.missing-head {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.missing-sim-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.missing-sim-row .add-btn {
+  white-space: nowrap;
 }
 
 .scan-status {
@@ -1453,7 +1591,24 @@ a.ghost-btn.linkish {
   }
 
   .hero-brand {
-    font-size: clamp(2rem, 10vw, 3.2rem);
+    font-size: clamp(1.15rem, 5.5vw, 1.75rem);
+  }
+
+  .hero h1 {
+    display: none;
+  }
+
+  .desktop-actions {
+    display: none;
+  }
+
+  .list-actions .primary-btn {
+    width: 100%;
+  }
+
+  .scan-tools .scan-btn {
+    flex: 1 1 calc(50% - 0.25rem);
+    text-align: center;
   }
 }
 

@@ -30,6 +30,27 @@ BROWSER_HEADERS = {
 }
 
 
+def fold_ascii(text: str) -> str:
+    table = str.maketrans(
+        {
+            "ı": "i",
+            "İ": "i",
+            "I": "i",
+            "ş": "s",
+            "Ş": "s",
+            "ğ": "g",
+            "Ğ": "g",
+            "ü": "u",
+            "Ü": "u",
+            "ö": "o",
+            "Ö": "o",
+            "ç": "c",
+            "Ç": "c",
+        }
+    )
+    return (text or "").translate(table)
+
+
 def _normalize_market(api_name: str | None) -> str | None:
     if not api_name:
         return None
@@ -142,26 +163,25 @@ async def _nearest_depot_ids(
     return []
 
 
-async def search_marketfiyati(
+async def _search_pages(
+    client: httpx.AsyncClient,
+    *,
     keywords: str,
-    latitude: float = DEFAULT_LAT,
-    longitude: float = DEFAULT_LON,
-    distance: int = DEFAULT_DISTANCE_KM,
-    size: int = 48,
-    market_ids: list[str] | None = None,
-) -> dict[str, Any]:
-    target = set(market_ids or [m.id for m in MARKETS if m.source == "marketfiyati"])
-    target &= {m.id for m in MARKETS if m.source == "marketfiyati"}
-
-    async with httpx.AsyncClient(
-        base_url=MARKETFIYATI_BASE,
-        headers=BROWSER_HEADERS,
-        timeout=30.0,
-    ) as client:
-        depots = await _nearest_depot_ids(client, latitude, longitude, distance)
+    latitude: float,
+    longitude: float,
+    distance: int,
+    size: int,
+    max_pages: int,
+    depots: list[str] | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """A–Z: tüm sayfaları tara, ürünleri birleştir."""
+    all_content: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    last: dict[str, Any] = {}
+    for page in range(max_pages):
         payload: dict[str, Any] = {
             "keywords": keywords,
-            "pages": 0,
+            "pages": page,
             "size": size,
             "latitude": latitude,
             "longitude": longitude,
@@ -169,23 +189,140 @@ async def search_marketfiyati(
         }
         if depots:
             payload["depots"] = depots
-
         response = await client.post("/api/v2/search", json=payload)
         response.raise_for_status()
-        data = response.json()
+        last = response.json()
+        chunk = last.get("content") or []
+        if not chunk:
+            break
+        for product in chunk:
+            pid = str(product.get("id") or "")
+            if pid and pid in seen_ids:
+                continue
+            if pid:
+                seen_ids.add(pid)
+            all_content.append(product)
+        # Son sayfa kısa geldiyse daha yok
+        if len(chunk) < size:
+            break
+    return last, all_content
+
+
+async def search_marketfiyati(
+    keywords: str,
+    latitude: float = DEFAULT_LAT,
+    longitude: float = DEFAULT_LON,
+    distance: int = DEFAULT_DISTANCE_KM,
+    size: int = 48,
+    market_ids: list[str] | None = None,
+    max_pages: int = 6,
+) -> dict[str, Any]:
+    """
+    Markette geçen tüm eşleşen ürünleri A–Z (çok sayfa) tara.
+    Depo kısıtı sonuçları bozarsa depo olmadan tekrar dener.
+    """
+    target = set(market_ids or [m.id for m in MARKETS if m.source == "marketfiyati"])
+    target &= {m.id for m in MARKETS if m.source == "marketfiyati"}
+    keywords = (keywords or "").strip()
+    if not keywords:
+        return {
+            "query": "",
+            "totalFound": 0,
+            "offerCount": 0,
+            "byMarket": {},
+            "offers": [],
+            "source": "marketfiyati.org.tr",
+            "location": {"latitude": latitude, "longitude": longitude, "distance": distance},
+        }
 
     offers: list[dict[str, Any]] = []
-    for product in data.get("content") or []:
-        offers.extend(
-            _flatten_offers(
-                product,
-                target,
-                origin_lat=latitude,
-                origin_lon=longitude,
-                max_km=float(distance),
-            )
-        )
+    data: dict[str, Any] = {}
+    used_kw = keywords
 
+    async with httpx.AsyncClient(
+        base_url=MARKETFIYATI_BASE,
+        headers=BROWSER_HEADERS,
+        timeout=45.0,
+    ) as client:
+        # Geniş tarama: önce depo kısıtı OLMADAN (tüm market ürünleri)
+        data, content = await _search_pages(
+            client,
+            keywords=keywords,
+            latitude=latitude,
+            longitude=longitude,
+            distance=distance,
+            size=size,
+            max_pages=max_pages,
+            depots=None,
+        )
+        offers = []
+        for product in content:
+            offers.extend(
+                _flatten_offers(
+                    product,
+                    target,
+                    origin_lat=latitude,
+                    origin_lon=longitude,
+                    max_km=float(distance) + 2.0,
+                )
+            )
+
+        # Boşsa ASCII anahtar
+        if not offers:
+            ascii_kw = fold_ascii(keywords)
+            if ascii_kw and ascii_kw.casefold() != keywords.casefold():
+                used_kw = ascii_kw
+                data, content = await _search_pages(
+                    client,
+                    keywords=ascii_kw,
+                    latitude=latitude,
+                    longitude=longitude,
+                    distance=distance,
+                    size=size,
+                    max_pages=max_pages,
+                    depots=None,
+                )
+                for product in content:
+                    offers.extend(
+                        _flatten_offers(
+                            product,
+                            target,
+                            origin_lat=latitude,
+                            origin_lon=longitude,
+                            max_km=float(distance) + 4.0,
+                        )
+                    )
+
+        # Hâlâ boşsa en yakın depolarla dene
+        if not offers:
+            depots = await _nearest_depot_ids(client, latitude, longitude, distance)
+            if depots:
+                data, content = await _search_pages(
+                    client,
+                    keywords=used_kw,
+                    latitude=latitude,
+                    longitude=longitude,
+                    distance=max(distance, 12),
+                    size=size,
+                    max_pages=max_pages,
+                    depots=depots,
+                )
+                for product in content:
+                    offers.extend(
+                        _flatten_offers(
+                            product,
+                            target,
+                            origin_lat=latitude,
+                            origin_lon=longitude,
+                            max_km=float(distance) + 6.0,
+                        )
+                    )
+
+    # Tekrarlayan teklifleri ele
+    uniq: dict[str, dict[str, Any]] = {}
+    for o in offers:
+        uniq[o["id"]] = o
+    offers = list(uniq.values())
     offers.sort(key=lambda o: (o["price"], o["marketLabel"], o["title"]))
 
     by_market: dict[str, int] = {}
@@ -194,12 +331,14 @@ async def search_marketfiyati(
 
     return {
         "query": keywords,
+        "searchKeywords": used_kw,
         "totalFound": data.get("numberOfFound", len(offers)),
         "offerCount": len(offers),
         "byMarket": by_market,
         "offers": offers,
         "source": "marketfiyati.org.tr",
         "location": {"latitude": latitude, "longitude": longitude, "distance": distance},
+        "pagesScanned": True,
     }
 
 

@@ -1,5 +1,6 @@
 from backend.relevance import is_relevant, relevance_score, split_query_tokens, qty_matches_offer
 from backend.robot import _parse_unit_price
+from backend.typo import correct_query
 
 
 def test_relevance():
@@ -20,7 +21,24 @@ def test_unit():
     assert abs(_parse_unit_price({"title": "Yağ", "price": 449.0, "volume": "5 L"})[0] - 89.8) < 0.01
 
 
+def test_typo():
+    r = correct_query("peinir")
+    assert r["corrected"] is True
+    assert "peynir" in r["query"].casefold() or "peynir" in r["query"]
+    r2 = correct_query("yumrta 30lu")
+    assert "yumurta" in r2["query"].casefold()
+    r3 = correct_query("pirnic")
+    assert "pirinç" in r3["query"] or "pirinc" in r3["query"].casefold()
+    r4 = correct_query("kaşar")
+    assert r4["query"] == "kaşar" or "kaşar" in r4["query"]
+    # başlıkta yakın yazım (çikolata / cikolata)
+    assert relevance_score("Ülker Çikolata", "cikolata") >= 3
+    r5 = correct_query("makrana")
+    assert "makarna" in r5["query"].casefold()
+
+
 if __name__ == "__main__":
     test_relevance()
     test_unit()
+    test_typo()
     print("unit_ok")

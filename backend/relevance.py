@@ -66,6 +66,37 @@ def _has_token(text: str, token: str) -> bool:
     return re.search(rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", text) is not None
 
 
+def _lev(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a or not b or abs(len(a) - len(b)) > 2:
+        return 99
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(
+                min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + (ca != cb))
+            )
+        prev = cur
+    return prev[-1]
+
+
+def _fuzzy_in_title(title_folded: str, token: str) -> bool:
+    """Başlık kelimelerinde 1–2 harf kaymasına izin ver (yazım hatası)."""
+    if len(token) < 4:
+        return False
+    max_d = 1 if len(token) <= 5 else 2
+    for word in re.findall(r"[a-z0-9]+", title_folded):
+        if len(word) < 3:
+            continue
+        if abs(len(word) - len(token)) > max_d:
+            continue
+        if _lev(token, word) <= max_d:
+            return True
+    return False
+
+
 def _qty_patterns(tok: str) -> list[str]:
     """'1l' / '500g' / '30' için esnek başlık/hacim kalıpları."""
     m = re.fullmatch(r"(\d+[.,]?\d*)(kg|g|gr|ml|lt|l|cl|adet|li|lı|lu|lü)?", tok)
@@ -132,7 +163,20 @@ def relevance_score(
         return 1
 
     snack_query = any(
-        x in hard for x in ("kraker", "cips", "cip", "crax", "cizi", "cubuk", "cerez")
+        x in hard
+        for x in (
+            "kraker",
+            "cips",
+            "cip",
+            "crax",
+            "cizi",
+            "cubuk",
+            "cerez",
+            "cikolata",
+            "biskuvi",
+            "gofret",
+            "wafer",
+        )
     )
     if not snack_query and _SNACK_NOISE.search(t):
         return 0
@@ -155,6 +199,8 @@ def relevance_score(
 
         if _has_token(t, tok) or tok in t:
             score += 4
+        elif _fuzzy_in_title(t, tok):
+            score += 3  # yazım hatasına yakın eşleşme
         else:
             if use_hard:
                 return 0

@@ -1,5 +1,5 @@
 /* SepetKıyas service worker — network-first shell so UI updates appear */
-const CACHE = "agt-market-shell-v13";
+const CACHE = "agt-market-shell-v16";
 const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

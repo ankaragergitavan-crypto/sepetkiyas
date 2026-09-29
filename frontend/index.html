@@ -77,14 +77,16 @@
             autocomplete="off"
             required
           />
-          <label class="sr-only" for="city">Konum</label>
-          <select id="city" name="city"></select>
-          <button type="submit" id="searchBtn">Ara</button>
+          <div class="city-field">
+            <label for="city">Ankara ilçe</label>
+            <select id="city" name="city" aria-label="Ankara ilçe seçin"></select>
+          </div>
+          <button type="submit" id="searchBtn">Ara / Karşılaştır</button>
         </form>
 
         <div class="scan-tools" aria-label="Görüntü ile ara">
-          <button type="button" class="ghost-btn" id="scanCameraBtn">Kamera ile tara</button>
-          <button type="button" class="ghost-btn" id="scanGalleryBtn">Galeriden seç</button>
+          <button type="button" class="scan-btn" id="scanCameraBtn">Kamera ile ürün tara</button>
+          <button type="button" class="scan-btn" id="scanGalleryBtn">Galeriden ürün seç</button>
           <input
             id="scanFileInput"
             type="file"
@@ -100,6 +102,28 @@
           />
         </div>
         <p class="muted tiny scan-status" id="scanStatus" hidden></p>
+
+        <section class="list-panel" aria-label="Alışveriş listesi">
+          <h2 class="list-panel-title">Alışveriş listesi tara</h2>
+          <p class="muted tiny list-panel-hint">
+            En fazla 40 satır yazın veya liste fotoğrafı yükleyin. Her satır tüm marketlerde
+            taranır: önce aynı ürün (marka + kg/adet), sonra en ucuz → o market sepetine eklenir.
+            Bulunamayanlar altta; yanında benzer, istersen ekle.
+          </p>
+          <textarea
+            id="listText"
+            rows="6"
+            placeholder="Örn.&#10;süt 1L&#10;yumurta 30&#10;Pınar kaşar 500g&#10;ekmek&#10;…"
+          ></textarea>
+          <div class="list-actions">
+            <button type="button" class="primary-btn" id="listScanBtn">Listeyi tara ve sepetlere ekle</button>
+            <button type="button" class="scan-btn" id="listCameraBtn">Liste fotoğrafı (kamera)</button>
+            <button type="button" class="scan-btn" id="listGalleryBtn">Liste fotoğrafı (galeri)</button>
+            <input id="listFileInput" type="file" accept="image/*" capture="environment" hidden />
+            <input id="listGalleryInput" type="file" accept="image/*" hidden />
+          </div>
+          <p class="muted tiny" id="listScanStatus" hidden></p>
+        </section>
 
         <div class="quick-queries" id="quickQueries" aria-label="Hızlı aramalar"></div>
         <div class="market-chips" id="marketChips"></div>
@@ -133,6 +157,14 @@
         <div class="status-row" id="statusRow"></div>
         <div class="robot-card" id="robotCard" hidden></div>
         <div class="offer-list" id="offerList"></div>
+      </section>
+
+      <section class="missing-section" id="missingSection" hidden>
+        <h2>Bulunamayanlar</h2>
+        <p class="muted tiny">
+          Listede olup aynı ürün bulunamayanlar. Yanında benzer varsa istersen ekle.
+        </p>
+        <div id="missingList" class="missing-list"></div>
       </section>
 
       <section class="empty" id="emptyState">

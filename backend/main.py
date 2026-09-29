@@ -32,6 +32,8 @@ from .volume import extract_volume_options, filter_offers_by_volume, normalize_v
 from .product_content import build_product_content
 from .cart_pdf import build_carts_pdf
 from .barcode_lookup import lookup_barcode
+from .typo import correct_query
+from .list_scan import parse_shopping_list, scan_list_items
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -156,6 +158,7 @@ async def markets() -> dict[str, Any]:
             "tavuk göğüs",
         ],
         "cities": CITY_PRESETS,
+        "cityLabel": "Ankara ilçe",
         "defaults": {
             "latitude": DEFAULT_LAT,
             "longitude": DEFAULT_LON,
@@ -166,14 +169,17 @@ async def markets() -> dict[str, Any]:
 
 @app.post("/api/search")
 async def search(body: SearchBody) -> dict[str, Any]:
-    query = body.query.strip()
-    if not query:
+    raw_query = body.query.strip()
+    if not raw_query:
         raise HTTPException(status_code=400, detail="Ürün adı gerekli")
+
+    typo = correct_query(raw_query)
+    query = typo["query"] or raw_query
 
     # Sadece Ankara konumları
     lat, lon = clamp_to_ankara(body.latitude, body.longitude)
-    # CarrefourSA şubeleri biraz daha uzak olabilir
-    distance = min(max(body.distance, 8), 15)
+    # CarrefourSA şubeleri biraz daha uzak olabilir — geniş tarama
+    distance = min(max(body.distance, 10), 20)
 
     selected = body.markets
     marketfiyati_ids = [m.id for m in MARKETS if m.source == "marketfiyati"]
@@ -187,6 +193,8 @@ async def search(body: SearchBody) -> dict[str, Any]:
             longitude=lon,
             distance=distance,
             market_ids=marketfiyati_ids,
+            size=48,
+            max_pages=6,
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Canlı fiyat alınamadı: {exc}") from exc
@@ -199,12 +207,20 @@ async def search(body: SearchBody) -> dict[str, Any]:
             volume=offer.get("volume"),
         )
 
-    # Alakasız teklifleri ele (ör. kaşar peynir → peynirli kraker)
-    result["offers"] = [
+    scored = list(result["offers"])
+    # Alakasız teklifleri ele — hepsi elenirse en iyi skorluları tut (arama kesilmesin)
+    filtered = [
         o
-        for o in result["offers"]
-        if is_relevant(o.get("title") or "", query, min_score=4, volume=o.get("volume"))
+        for o in scored
+        if is_relevant(o.get("title") or "", query, min_score=3, volume=o.get("volume"))
     ]
+    if filtered:
+        result["offers"] = filtered
+    elif scored:
+        scored.sort(key=lambda o: (-(o.get("relevance") or 0), o.get("price") or 0))
+        result["offers"] = scored[:40]
+    else:
+        result["offers"] = []
 
     getir_status: dict[str, Any] | None = None
     want_getir = body.include_getir and (not selected or "getir_buyuk" in selected)
@@ -224,17 +240,17 @@ async def search(body: SearchBody) -> dict[str, Any]:
                 "offerCount": getir.get("offerCount", 0),
             }
             result["offers"].extend(getir.get("offers") or [])
-            # Getir sonuçlarına da alaka uygula
-            result["offers"] = [
+            again = [
                 o
                 for o in result["offers"]
                 if is_relevant(
                     o.get("title") or "",
                     query,
-                    min_score=4,
+                    min_score=3,
                     volume=o.get("volume"),
                 )
             ]
+            result["offers"] = again if again else result["offers"]
         except Exception as exc:  # noqa: BLE001
             getir_status = {
                 "available": False,
@@ -281,6 +297,11 @@ async def search(body: SearchBody) -> dict[str, Any]:
 
     return {
         **result,
+        "query": query,
+        "originalQuery": typo["originalQuery"],
+        "typoCorrected": typo["corrected"],
+        "typoCorrections": typo["corrections"],
+        "typoNote": typo["note"],
         "source": " + ".join(sources),
         "volumeOptions": volumes,
         "activeVolume": body.volume,
@@ -315,6 +336,49 @@ async def search_get(
             volume=volume,
         )
     )
+
+
+class ListScanBody(BaseModel):
+    text: str = Field(..., min_length=1, max_length=8000)
+    latitude: float = DEFAULT_LAT
+    longitude: float = DEFAULT_LON
+    distance: int = Field(DEFAULT_DISTANCE_KM, ge=1, le=50)
+    markets: list[str] | None = None
+
+
+@app.post("/api/list-scan")
+async def list_scan(body: ListScanBody) -> dict[str, Any]:
+    """Alışveriş listesi (max 40 satır): aynı ürün+kg+marka önceliği, en ucuz → market sepeti."""
+    lines = parse_shopping_list(body.text)
+    if not lines:
+        raise HTTPException(status_code=400, detail="Listede geçerli satır yok")
+
+    lat, lon = clamp_to_ankara(body.latitude, body.longitude)
+    distance = min(max(body.distance, 8), 15)
+    selected = body.markets
+    marketfiyati_ids = [m.id for m in MARKETS if m.source == "marketfiyati"]
+    if selected:
+        marketfiyati_ids = [m for m in marketfiyati_ids if m in selected]
+
+    async def search_one(q: str) -> dict[str, Any]:
+        return await search_marketfiyati(
+            keywords=q,
+            latitude=lat,
+            longitude=lon,
+            distance=distance,
+            market_ids=marketfiyati_ids,
+            size=36,
+            max_pages=4,
+        )
+
+    result = await scan_list_items(lines, search_one=search_one, concurrency=3)
+    return {
+        **result,
+        "lines": lines,
+        "location": {"latitude": lat, "longitude": lon, "distance": distance},
+        "source": "marketfiyati.org.tr",
+    }
+
 
 
 class ProductContentBody(BaseModel):
