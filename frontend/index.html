@@ -151,6 +151,16 @@
     </aside>
     <div class="scrim" id="scrim" hidden></div>
 
+    <div class="product-modal" id="productModal" hidden aria-hidden="true">
+      <div class="product-modal-card" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+        <div class="product-modal-head">
+          <h2 id="productModalTitle">Ürün içeriği</h2>
+          <button type="button" class="icon-btn" id="closeProductModal" aria-label="Kapat">×</button>
+        </div>
+        <div class="product-modal-body" id="productModalBody"></div>
+      </div>
+    </div>
+
     <script src="/static/app.js" type="module"></script>
   </body>
 </html>

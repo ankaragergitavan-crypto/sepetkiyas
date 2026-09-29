@@ -1270,3 +1270,115 @@ a.ghost-btn.linkish {
     font-size: clamp(2.2rem, 11vw, 3.4rem);
   }
 }
+
+/* Ürün içerik modalı */
+.product-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  background: rgba(4, 10, 7, 0.72);
+}
+
+.product-modal[hidden] {
+  display: none;
+}
+
+.product-modal-card {
+  width: min(560px, 100%);
+  max-height: min(88vh, 900px);
+  overflow: auto;
+  background: #132019;
+  border: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  padding: 1rem 1.05rem 1.35rem;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.product-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.product-modal-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-family: var(--display);
+}
+
+.product-detail-hero {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.product-detail-hero img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.detail-h {
+  margin: 0.85rem 0 0.35rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.detail-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.88rem;
+}
+
+.detail-list .ingredients {
+  line-height: 1.45;
+}
+
+.detail-list .warn-line {
+  color: #ffc857;
+}
+
+.detail-link,
+button.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.offer[data-detail-idx],
+.group-row[data-detail-idx] {
+  cursor: pointer;
+}
+
+.product-detail-actions {
+  margin-top: 1rem;
+}
+
+@media (min-width: 761px) {
+  .product-modal {
+    place-items: center;
+    padding: 1.5rem;
+  }
+
+  .product-modal-card {
+    border-radius: 18px;
+    max-height: min(82vh, 860px);
+  }
+}

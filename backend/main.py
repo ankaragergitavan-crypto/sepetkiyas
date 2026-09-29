@@ -28,6 +28,7 @@ from .grouping import build_product_groups, sort_offers_by_unit_price
 from .robot import annotate_offers, build_robot_pick
 from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
+from .product_content import build_product_content
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -311,6 +312,44 @@ async def search_get(
             volume=volume,
         )
     )
+
+
+class ProductContentBody(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    brand: str | None = None
+    volume: str | None = None
+    categories: list[str] | None = None
+    mainCategory: str | None = None
+    menuCategory: str | None = None
+    promotionText: str | None = None
+    imageUrl: str | None = None
+    marketLabel: str | None = None
+    depotName: str | None = None
+    price: float | None = None
+    unitPriceEstimate: float | None = None
+    unitPriceUnit: str | None = None
+    healthScore: int | None = None
+    economyScore: int | None = None
+    labelEvidence: list[str] | None = None
+    labelNotes: list[str] | None = None
+    analysisNote: str | None = None
+    source: str | None = None
+    updatedAt: str | None = None
+
+
+@app.post("/api/product-content")
+async def product_content(body: ProductContentBody) -> dict[str, Any]:
+    """Tıklanan ürün: market kaynağı + varsa Open Food Facts içindekiler."""
+    offer = body.model_dump()
+    return await build_product_content(offer)
+
+
+@app.get("/api/product-content")
+async def product_content_get(
+    title: str = Query(..., min_length=1, max_length=200),
+    brand: str | None = None,
+) -> dict[str, Any]:
+    return await build_product_content({"title": title, "brand": brand})
 
 
 @app.get("/api/aktuel")

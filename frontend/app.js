@@ -44,6 +44,10 @@ const els = {
   liveTimer: document.getElementById("liveTimer"),
   liveTimerValue: document.getElementById("liveTimerValue"),
   quickQueries: document.getElementById("quickQueries"),
+  productModal: document.getElementById("productModal"),
+  productModalBody: document.getElementById("productModalBody"),
+  productModalTitle: document.getElementById("productModalTitle"),
+  closeProductModal: document.getElementById("closeProductModal"),
 };
 
 async function syncTimer() {
@@ -343,6 +347,117 @@ function scoreRow(label, score) {
     </div>`;
 }
 
+function openProductModal(open) {
+  if (!els.productModal) return;
+  els.productModal.hidden = !open;
+  els.productModal.setAttribute("aria-hidden", open ? "false" : "true");
+  if (!open) els.productModalBody.innerHTML = "";
+}
+
+async function showProductContent(offer) {
+  if (!offer || !els.productModalBody) return;
+  openProductModal(true);
+  if (els.productModalTitle) {
+    els.productModalTitle.textContent = offer.title || "Ürün içeriği";
+  }
+  const cats = (offer.categories || []).map((c) => escapeHtml(String(c))).join(", ");
+  els.productModalBody.innerHTML = `
+    <div class="product-detail-hero">
+      ${
+        offer.imageUrl
+          ? `<img src="${offer.imageUrl}" alt="" loading="lazy" />`
+          : ""
+      }
+      <div>
+        <p class="offer-title">${escapeHtml(offer.title || "")}</p>
+        <p class="muted">${escapeHtml([offer.brand, offer.volume].filter(Boolean).join(" · "))}</p>
+        <p><strong>${money(offer.price)}</strong> · ${escapeHtml(offer.marketLabel || "")}${
+          offer.depotName ? ` · ${escapeHtml(offer.depotName)}` : ""
+        }</p>
+      </div>
+    </div>
+    <div class="score-bars" title="${escapeHtml(offer.analysisNote || "Etiket taraması")}">
+      ${scoreRow("Sağlık", offer.healthScore)}
+      ${scoreRow("Fiyat", offer.economyScore)}
+    </div>
+    <h3 class="detail-h">Market kaynağı (canlı)</h3>
+    <ul class="detail-list">
+      ${offer.mainCategory ? `<li>Ana kategori: ${escapeHtml(offer.mainCategory)}</li>` : ""}
+      ${offer.menuCategory ? `<li>Menü: ${escapeHtml(offer.menuCategory)}</li>` : ""}
+      ${cats ? `<li>Kategoriler: ${cats}</li>` : ""}
+      ${offer.promotionText ? `<li>Kampanya: ${escapeHtml(offer.promotionText)}</li>` : ""}
+      ${unitPriceLabel(offer) ? `<li>Birim fiyat: ${escapeHtml(unitPriceLabel(offer))}</li>` : ""}
+      ${offer.updatedAt ? `<li>Güncelleme: ${escapeHtml(offer.updatedAt)}</li>` : ""}
+      <li class="warn-line">İçindekiler listesi market fiyat API’sinde yok.</li>
+    </ul>
+    <h3 class="detail-h">Etiket analizi</h3>
+    <ul class="detail-list">
+      ${(offer.labelEvidence || ["nötr sinyal"])
+        .map((e) => `<li>${escapeHtml(e)}</li>`)
+        .join("")}
+    </ul>
+    <h3 class="detail-h">İçindekiler (açık veri)</h3>
+    <p class="muted" id="offStatus">Open Food Facts aranıyor…</p>
+    <div id="offBlock"></div>
+    <div class="product-detail-actions">
+      <button type="button" class="add-btn" data-idx="${state.offers.indexOf(offer)}">Sepete ekle</button>
+    </div>
+  `;
+
+  const offStatus = document.getElementById("offStatus");
+  const offBlock = document.getElementById("offBlock");
+  try {
+    const res = await fetch("/api/product-content", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: offer.title,
+        brand: offer.brand,
+        volume: offer.volume,
+        categories: offer.categories || [],
+        mainCategory: offer.mainCategory,
+        menuCategory: offer.menuCategory,
+        promotionText: offer.promotionText,
+        imageUrl: offer.imageUrl,
+        marketLabel: offer.marketLabel,
+        depotName: offer.depotName,
+        price: offer.price,
+        unitPriceEstimate: offer.unitPriceEstimate,
+        unitPriceUnit: offer.unitPriceUnit,
+        healthScore: offer.healthScore,
+        economyScore: offer.economyScore,
+        labelEvidence: offer.labelEvidence,
+        labelNotes: offer.labelNotes,
+        analysisNote: offer.analysisNote,
+        source: offer.source,
+        updatedAt: offer.updatedAt,
+      }),
+    });
+    const data = await res.json();
+    const off = data.openFoodFacts || {};
+    if (offStatus) offStatus.textContent = off.note || "";
+    if (!offBlock) return;
+    if (off.found || off.ingredientsText || off.nutriscore || off.novaGroup) {
+      offBlock.innerHTML = `
+        <ul class="detail-list">
+          ${off.matchedName ? `<li>Eşleşen kayıt: ${escapeHtml(off.matchedName)}${off.matchedBrand ? ` · ${escapeHtml(off.matchedBrand)}` : ""}</li>` : ""}
+          ${off.matchScore != null ? `<li>Eşleşme skoru: ${off.matchScore}</li>` : ""}
+          ${off.ingredientsText ? `<li class="ingredients"><strong>İçindekiler:</strong> ${escapeHtml(off.ingredientsText)}</li>` : "<li>İçindekiler metni bu kayıtta yok.</li>"}
+          ${off.allergens ? `<li>Alerjen: ${escapeHtml(String(off.allergens))}</li>` : ""}
+          ${off.nutriscore ? `<li>Nutri-Score: ${escapeHtml(String(off.nutriscore).toUpperCase())}</li>` : ""}
+          ${off.novaGroup != null ? `<li>NOVA: ${escapeHtml(String(off.novaGroup))}</li>` : ""}
+          ${off.url ? `<li><a href="${escapeHtml(off.url)}" target="_blank" rel="noopener">Open Food Facts kaydı</a></li>` : ""}
+        </ul>`;
+    } else {
+      offBlock.innerHTML = `<p class="muted">${escapeHtml(off.note || "İçindekiler bulunamadı (uydurma eklenmedi).")}</p>`;
+    }
+  } catch (err) {
+    if (offStatus) {
+      offStatus.textContent = `İçerik servisi yanıt vermedi: ${err.message || err}`;
+    }
+  }
+}
+
 function trendBadge(o) {
   if (!o.trend || o.trend === "flat") return "";
   const down = o.trend === "down";
@@ -436,7 +551,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
     : "";
   const unit = unitPriceLabel(o);
   return `
-    <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
+    <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" data-detail-idx="${realIdx}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
       ${img}
       <div>
         <p class="offer-title">${escapeHtml(o.title)}</p>
@@ -467,6 +582,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
               .map((e) => `<li>${escapeHtml(e)}</li>`)
               .join("")}
           </ul>
+          <button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">İçeriği / açıklamayı gör</button>
         </div>
       </div>
       <div class="offer-side">
@@ -493,7 +609,7 @@ function paintTable(offers) {
             ? String(o.unitPriceValue)
             : "—";
       return `<tr class="${isBest ? "best-deal" : ""}">
-        <td class="td-title">${escapeHtml(o.title)}${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
+        <td class="td-title"><button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">${escapeHtml(o.title)}</button>${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
           <div class="score-bars compact table-scores" title="${escapeHtml(o.analysisNote || "Etiket taraması")}">
             ${scoreRow("Sağlık", o.healthScore)}
             ${scoreRow("Fiyat", o.economyScore)}
@@ -534,7 +650,7 @@ function paintGrouped(groups) {
         .map((o) => {
           const realIdx = state.offers.indexOf(o);
           const isBest = isBestPrice(o, best);
-          return `<div class="group-row ${isBest ? "best-deal" : ""}">
+          return `<div class="group-row ${isBest ? "best-deal" : ""}" data-detail-idx="${realIdx}">
             <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
             <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}${isBest ? ` · En uygun` : ""}</span>
             <span class="group-price ${isBest ? "best" : ""}">${money(o.price)}</span>
@@ -545,7 +661,7 @@ function paintGrouped(groups) {
             </div>
             ${trendBadge(o)}
             <button class="add-btn compact" data-idx="${realIdx}">Ekle</button>
-            <div class="group-evidence muted tiny">${escapeHtml(((o.labelEvidence || [])[0] || "etiket taraması: nötr"))}</div>
+            <div class="group-evidence muted tiny">${escapeHtml(((o.labelEvidence || [])[0] || "etiket taraması: nötr"))} · <button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">İçeriği gör</button></div>
           </div>`;
         })
         .join("");
@@ -729,10 +845,30 @@ els.form.addEventListener("submit", async (e) => {
 });
 
 els.offerList.addEventListener("click", (e) => {
+  const detail = e.target.closest("[data-detail-idx]");
+  const btn = e.target.closest(".add-btn");
+  if (btn) {
+    e.stopPropagation();
+    const offer = state.offers[Number(btn.dataset.idx)];
+    if (offer) addToCart(offer);
+    return;
+  }
+  if (detail) {
+    const offer = state.offers[Number(detail.dataset.detailIdx)];
+    if (offer) showProductContent(offer);
+  }
+});
+
+els.productModalBody?.addEventListener("click", (e) => {
   const btn = e.target.closest(".add-btn");
   if (!btn) return;
   const offer = state.offers[Number(btn.dataset.idx)];
   if (offer) addToCart(offer);
+});
+
+els.closeProductModal?.addEventListener("click", () => openProductModal(false));
+els.productModal?.addEventListener("click", (e) => {
+  if (e.target === els.productModal) openProductModal(false);
 });
 
 els.robotCard?.addEventListener("click", (e) => {
