@@ -266,7 +266,53 @@ function dismissKeyboard() {
 
 function registerPwa() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker
+    .register("/sw.js?v=19")
+    .then((reg) => {
+      reg.update().catch(() => {});
+      if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", () => {
+          if (sw.state === "installed" && navigator.serviceWorker.controller) {
+            sw.postMessage("SKIP_WAITING");
+          }
+        });
+      });
+    })
+    .catch(() => {});
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    // Yüklü PWA yeni SW alınca bir kez yenile
+    location.reload();
+  });
+}
+
+async function wakeServer() {
+  const banner = document.getElementById("bootBanner");
+  const show = (msg, isErr) => {
+    if (!banner) return;
+    banner.hidden = false;
+    banner.className = "boot-banner" + (isErr ? " err" : "");
+    banner.textContent = msg;
+  };
+  try {
+    show("Sunucu uyanıyor… (ilk açılış 30 sn sürebilir)");
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 60000);
+    const res = await fetch("/api/health", { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) throw new Error("health");
+    banner.hidden = true;
+    return true;
+  } catch {
+    show("Sunucu yanıt vermiyor. İnterneti kontrol edip Yenile’ye basın.", true);
+    return false;
+  }
 }
 
 function setupInstall() {
@@ -329,9 +375,10 @@ async function boot() {
   registerPwa();
   setupInstall();
   startTimerLoop();
+  await wakeServer();
 
   if (new URLSearchParams(location.search).get("focus") === "search") {
-    els.query.focus();
+    els.query?.focus();
   }
 
   try {
@@ -1783,7 +1830,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "18",
+  build: "19",
 };
 
 boot().catch((err) => {

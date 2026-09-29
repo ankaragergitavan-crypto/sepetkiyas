@@ -1,8 +1,9 @@
 {
+  "id": "/?source=pwa",
   "name": "AGT MARKET KARŞILAŞTIRMA",
-  "short_name": "AGT MARKET KARŞILAŞTIRMA",
+  "short_name": "AGT Market",
   "description": "A101, Migros, Şok, BİM, Tarım Kredi fiyat karşılaştırma ve market sepetleri",
-  "start_url": "/",
+  "start_url": "/?source=pwa&v=19",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -35,7 +36,7 @@
     {
       "name": "Ürün ara",
       "short_name": "Ara",
-      "url": "/?focus=search",
+      "url": "/?source=pwa&focus=search&v=19",
       "description": "Canlı market fiyatı karşılaştır"
     }
   ]

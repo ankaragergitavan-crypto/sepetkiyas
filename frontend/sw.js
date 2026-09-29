@@ -1,6 +1,6 @@
-/* AGT MARKET — network-first; JS/CSS asla eski cache’ten gelmesin */
-const CACHE = "agt-market-shell-v18";
-const BUILD = "18";
+/* AGT MARKET PWA — v19: yüklü uygulamada taze JS/CSS, API ağdan */
+const CACHE = "agt-market-shell-v19";
+const BUILD = "19";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -9,35 +9,47 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
 
-  const url = new URL(req.url);
+  let url;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return;
+  }
   if (url.origin !== self.location.origin) return;
 
-  // API: sadece ağ
+  // API daima ağ — Render uyandırma için cache yok
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
-      fetch(req).catch(
+      fetch(req, { cache: "no-store" }).catch(
         () =>
-          new Response(JSON.stringify({ error: "Çevrimdışı", offline: true }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          })
+          new Response(
+            JSON.stringify({
+              error: "Çevrimdışı veya sunucu uyanıyor",
+              offline: true,
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+          )
       )
     );
     return;
   }
 
-  // HTML / JS / CSS / SW: her zaman ağ (butonlar eski cache yüzünden ölmesin)
-  const noCache =
+  const critical =
     url.pathname === "/" ||
     url.pathname.endsWith(".html") ||
     url.pathname.endsWith(".js") ||
@@ -45,9 +57,9 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/sw.js" ||
     url.pathname.endsWith("manifest.webmanifest");
 
-  if (noCache) {
+  if (critical) {
     event.respondWith(
-      fetch(new Request(req, { cache: "no-store" })).catch(() => caches.match(req))
+      fetch(req, { cache: "no-store" }).catch(() => caches.match(req))
     );
     return;
   }
