@@ -16,12 +16,24 @@ def _clean_name(name: str) -> str:
 
 
 async def lookup_barcode(code: str) -> dict[str, Any]:
+    from .security import STRICT_PRIVACY
+
     raw = re.sub(r"\D", "", code or "")
     if len(raw) < 8:
         return {
             "found": False,
             "code": code,
             "note": "Geçerli barkod değil.",
+        }
+
+    if STRICT_PRIVACY:
+        return {
+            "found": False,
+            "code": raw,
+            "available": False,
+            "privacy": True,
+            "note": "Gizlilik modu: dış barkod servisi kapalı. Etiket OCR veya elle arayın.",
+            "query": raw,
         }
 
     url = f"https://world.openfoodfacts.org/api/v2/product/{raw}.json"

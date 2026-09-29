@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=19" />
+    <link rel="manifest" href="/manifest.webmanifest?v=20" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,12 +29,12 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=19" />
+    <link rel="stylesheet" href="/static/styles.css?v=20" />
     <script>
-      window.__AGT_BUILD = "19";
+      window.__AGT_BUILD = "20";
       /* Yüklü PWA'da eski cache / bozuk SW uygulamayı öldürüyordu */
       (function () {
-        var BUILD = "19";
+        var BUILD = "20";
         function wipeThenReload() {
           var tasks = [];
           if ("serviceWorker" in navigator) {
@@ -78,6 +78,19 @@
     </script>
   </head>
   <body>
+    <div id="gateOverlay" class="gate-overlay" hidden>
+      <div class="gate-card">
+        <h2>Güvenli giriş</h2>
+        <p class="muted tiny">
+          Bu uygulama dışarıya kapalıdır. Sepet yalnızca bu cihazda kalır; telefona dışarıdan
+          erişim açılmaz. Canlı fiyat için sadece market kaynağına ürün araması gider.
+        </p>
+        <label class="sr-only" for="gatePin">Şifre</label>
+        <input id="gatePin" type="password" inputmode="text" autocomplete="current-password" placeholder="Erişim şifresi" />
+        <button type="button" class="primary-btn" id="gateUnlockBtn">Kilidi aç</button>
+        <p class="muted tiny" id="gateMsg"></p>
+      </div>
+    </div>
     <div class="bg-grid" aria-hidden="true"></div>
     <div class="bg-glow" aria-hidden="true"></div>
 
@@ -291,7 +304,7 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=19" defer></script>
+    <script src="/static/app.js?v=20" defer></script>
     <script>
       /* app.js yüklenmezse bile arama çalışsın (yüklü PWA kurtarma) */
       (function () {
@@ -330,7 +343,7 @@
             var t = setTimeout(function () {
               ctrl.abort();
             }, 45000);
-            var res = await fetch("/api/health", { cache: "no-store", signal: ctrl.signal });
+            var res = await fetch("/api/health", { cache: "no-store", credentials: "same-origin", signal: ctrl.signal });
             clearTimeout(t);
             if (!res.ok) throw new Error("Sunucu yanıt vermedi");
             var b = document.getElementById("bootBanner");
@@ -365,6 +378,7 @@
             await wakeServer();
             var res = await fetch("/api/search", {
               method: "POST",
+              credentials: "same-origin",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 query: q,

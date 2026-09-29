@@ -1,6 +1,6 @@
 /* AGT MARKET PWA — v19: yüklü uygulamada taze JS/CSS, API ağdan */
-const CACHE = "agt-market-shell-v19";
-const BUILD = "19";
+const CACHE = "agt-market-shell-v20";
+const BUILD = "20";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

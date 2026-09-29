@@ -1261,19 +1261,44 @@ main {
   display: none !important;
 }
 
-.boot-banner {
-  margin: 0.5rem 0 0.75rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: 14px;
-  border: 1px solid rgba(125, 255, 179, 0.35);
-  background: rgba(125, 255, 179, 0.1);
+.gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 10, 7, 0.92);
+}
+
+.gate-overlay[hidden] {
+  display: none !important;
+}
+
+.gate-card {
+  width: min(400px, 100%);
+  padding: 1.25rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #132019;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.gate-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.gate-card input {
+  min-height: 3rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
   color: var(--ink);
-  font-size: 0.9rem;
-  line-height: 1.4;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
+  padding: 0 0.9rem;
+  font: inherit;
+  font-size: 16px;
 }
 
 .boot-banner.err {

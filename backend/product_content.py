@@ -56,6 +56,16 @@ def _token_overlap(a: str, b: str) -> float:
 
 
 async def lookup_open_food_facts(title: str, brand: str | None = None) -> dict[str, Any]:
+    from .security import STRICT_PRIVACY
+
+    if STRICT_PRIVACY:
+        return {
+            "found": False,
+            "available": False,
+            "privacy": True,
+            "source": "disabled",
+            "note": "Gizlilik modu: dış gıda veritabanı kapalı. Yalnızca market etiket alanları.",
+        }
     """Açık veriden içindekiler; eşleşme zayıfsa boş döner (uydurma yok)."""
     q = " ".join(x for x in [brand or "", title] if x).strip()
     if len(q) < 3:

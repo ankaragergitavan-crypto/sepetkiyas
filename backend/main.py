@@ -34,6 +34,18 @@ from .cart_pdf import build_carts_pdf
 from .barcode_lookup import lookup_barcode
 from .typo import correct_query
 from .list_scan import parse_shopping_list, scan_list_items
+from .security import (
+    ACCESS_PIN,
+    COOKIE_NAME,
+    SESSION_DAYS,
+    STRICT_PRIVACY,
+    SecurityFirewallMiddleware,
+    cors_origins_for_starlette,
+    gate_enabled,
+    make_session_cookie_value,
+    privacy_payload,
+    unlock_ok,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -76,6 +88,7 @@ def timer_payload() -> dict[str, Any]:
             f"her ayın 1'inde yenilenir ({renew_y:04d}-{renew_m:02d}-01). "
             "Kota bitince ay sonuna kadar kilitlenir — Render Billing'den bak."
         ),
+        "privacy": privacy_payload(),
     }
 
 
@@ -85,16 +98,62 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app = FastAPI(title="AGT MARKET KARŞILAŞTIRMA", version="1.4.0")
+app = FastAPI(title="AGT MARKET KARŞILAŞTIRMA", version="1.5.0")
 
+# Dışarıya açık CORS yok — sadece kendi origin (veya ALLOWED_ORIGINS)
+_cors = cors_origins_for_starlette()
 app.add_middleware(ActivityMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(SecurityFirewallMiddleware)
+if _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
+
+
+class UnlockBody(BaseModel):
+    pin: str = Field(..., min_length=1, max_length=64)
+
+
+@app.get("/api/auth/status")
+async def auth_status(request: Request) -> dict[str, Any]:
+    from .security import request_authorized
+
+    return {
+        **privacy_payload(),
+        "unlocked": (not gate_enabled()) or request_authorized(request),
+        "hint": "Şifreyi Render → Environment → ACCESS_PIN ile değiştirin.",
+    }
+
+
+@app.post("/api/auth/unlock")
+async def auth_unlock(body: UnlockBody, request: Request, response: Response) -> dict[str, Any]:
+    if not gate_enabled():
+        return {"ok": True, "gateEnabled": False, "unlocked": True, **privacy_payload()}
+    if not unlock_ok(body.pin):
+        raise HTTPException(status_code=403, detail="Şifre hatalı")
+    token = make_session_cookie_value(ACCESS_PIN)
+    secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+        max_age=SESSION_DAYS * 86400,
+        path="/",
+    )
+    return {"ok": True, "gateEnabled": True, "unlocked": True, **privacy_payload()}
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(response: Response) -> dict[str, Any]:
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return {"ok": True, "locked": True}
+
 
 
 class SearchBody(BaseModel):
@@ -223,7 +282,11 @@ async def search(body: SearchBody) -> dict[str, Any]:
         result["offers"] = []
 
     getir_status: dict[str, Any] | None = None
-    want_getir = body.include_getir and (not selected or "getir_buyuk" in selected)
+    want_getir = (
+        body.include_getir
+        and not STRICT_PRIVACY
+        and (not selected or "getir_buyuk" in selected)
+    )
     if want_getir:
         try:
             getir = await search_getir(

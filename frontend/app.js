@@ -77,7 +77,7 @@ const els = {
 
 async function syncTimer() {
   try {
-    const res = await fetch("/api/timer", { cache: "no-store" });
+    const res = await apiFetch("/api/timer", { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
     const hrs = Math.round(data.freeHoursPerMonth ?? 750);
@@ -112,6 +112,76 @@ function money(n) {
     style: "currency",
     currency: "TRY",
   }).format(n || 0);
+}
+
+async function apiFetch(url, options = {}) {
+  const opts = {
+    credentials: "same-origin",
+    cache: "no-store",
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+    },
+  };
+  const res = await fetch(url, opts);
+  if (res.status === 401 || res.status === 403) {
+    const data = await res.clone().json().catch(() => ({}));
+    if (data.code === "auth_required" || res.status === 401) {
+      showGate(true, data.detail || "Giriş gerekli");
+    }
+    if (data.code === "ip_blocked") {
+      showGate(true, "IP güvenlik duvarı: erişim engellendi");
+    }
+  }
+  return res;
+}
+
+function showGate(show, msg) {
+  const overlay = document.getElementById("gateOverlay");
+  const gateMsg = document.getElementById("gateMsg");
+  if (!overlay) return;
+  overlay.hidden = !show;
+  if (gateMsg && msg) gateMsg.textContent = msg;
+}
+
+async function checkGate() {
+  try {
+    const res = await apiFetch("/api/auth/status");
+    const data = await res.json();
+    if (data.gateEnabled && !data.unlocked) {
+      showGate(true, data.hint || "Erişim şifresi gerekli");
+      return false;
+    }
+    showGate(false);
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+async function unlockGate() {
+  const pinEl = document.getElementById("gatePin");
+  const gateMsg = document.getElementById("gateMsg");
+  const pin = (pinEl?.value || "").trim();
+  if (!pin) {
+    if (gateMsg) gateMsg.textContent = "Şifre girin";
+    return;
+  }
+  try {
+    const res = await apiFetch("/api/auth/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Şifre hatalı");
+    showGate(false);
+    if (gateMsg) gateMsg.textContent = "";
+    // Tam boot için yenile (cookie set edildi)
+    location.reload();
+  } catch (err) {
+    if (gateMsg) gateMsg.textContent = err.message || "Şifre hatalı";
+  }
 }
 
 function unitPriceLabel(o) {
@@ -267,7 +337,7 @@ function dismissKeyboard() {
 function registerPwa() {
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker
-    .register("/sw.js?v=19")
+    .register("/sw.js?v=20")
     .then((reg) => {
       reg.update().catch(() => {});
       if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
@@ -304,7 +374,7 @@ async function wakeServer() {
     show("Sunucu uyanıyor… (ilk açılış 30 sn sürebilir)");
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 60000);
-    const res = await fetch("/api/health", { cache: "no-store", signal: ctrl.signal });
+    const res = await apiFetch("/api/health", { cache: "no-store", signal: ctrl.signal });
     clearTimeout(t);
     if (!res.ok) throw new Error("health");
     banner.hidden = true;
@@ -372,6 +442,18 @@ async function boot() {
   window.visualViewport?.addEventListener("resize", fitViewportToScreen);
   window.visualViewport?.addEventListener("scroll", fitViewportToScreen);
 
+  document.getElementById("gateUnlockBtn")?.addEventListener("click", () => unlockGate());
+  document.getElementById("gatePin")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") unlockGate();
+  });
+
+  const open = await checkGate();
+  if (!open) {
+    // Kilit açık değilse sunucu çağrılarını bekle
+    registerPwa();
+    return;
+  }
+
   registerPwa();
   setupInstall();
   startTimerLoop();
@@ -382,7 +464,7 @@ async function boot() {
   }
 
   try {
-    const res = await fetch("/api/markets");
+    const res = await apiFetch("/api/markets");
     const data = await res.json();
     state.markets = data.markets || [];
     state.cities = data.cities || [];
@@ -746,7 +828,7 @@ async function showProductContent(offer) {
   const offStatus = document.getElementById("offStatus");
   const offBlock = document.getElementById("offBlock");
   try {
-    const res = await fetch("/api/product-content", {
+    const res = await apiFetch("/api/product-content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1187,7 +1269,7 @@ async function runSearch(rawQuery, meta = {}) {
   els.searchBtn.textContent = "Aranıyor…";
   setScanStatus(meta.status || `Tüm marketlerde aranıyor: ${query}`);
   try {
-    const res = await fetch("/api/search", {
+    const res = await apiFetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1321,7 +1403,7 @@ function cleanOcrQuery(text) {
 
 async function lookupBarcodeAndSearch(code) {
   setScanStatus(`Barkod okundu: ${code} · ürün adı aranıyor…`);
-  const res = await fetch(`/api/barcode/${encodeURIComponent(code)}`);
+  const res = await apiFetch(`/api/barcode/${encodeURIComponent(code)}`);
   const data = await res.json();
   const query = data.query || code;
   await runSearch(query, {
@@ -1539,7 +1621,7 @@ async function runListScan(rawText) {
   setListStatus("Liste taranıyor (marka + kg + en ucuz)…");
   dismissKeyboard();
   try {
-    const res = await fetch("/api/list-scan", {
+    const res = await apiFetch("/api/list-scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1755,7 +1837,7 @@ async function downloadCartsPdf() {
     els.pdfMsg.textContent = "PDF hazırlanıyor…";
   }
   try {
-    const res = await fetch("/api/carts/pdf", {
+    const res = await apiFetch("/api/carts/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1812,7 +1894,7 @@ els.clearCarts?.addEventListener("click", () => {
 els.desktopBtn?.addEventListener("click", async () => {
   if (els.desktopMsg) els.desktopMsg.textContent = "Ekleniyor…";
   try {
-    const res = await fetch("/api/install-desktop", { method: "POST" });
+    const res = await apiFetch("/api/install-desktop", { method: "POST" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Kısayol eklenemedi");
     if (els.desktopMsg) els.desktopMsg.textContent = data.message || "Masaüstüne eklendi.";
@@ -1830,7 +1912,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "19",
+  build: "20",
 };
 
 boot().catch((err) => {
