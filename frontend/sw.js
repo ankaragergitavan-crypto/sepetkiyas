@@ -1,5 +1,5 @@
-/* SepetKıyas service worker — offline shell + network-first API */
-const CACHE = "sepetkiyas-shell-v1";
+/* SepetKıyas service worker — network-first shell so UI updates appear */
+const CACHE = "sepetkiyas-shell-v2";
 const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -35,18 +35,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // HTML/JS/CSS: önce ağ — robot gibi yeni özellikler takılı kalmasın
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          if (res.ok && url.origin === self.location.origin) {
-            caches.open(CACHE).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        if (res.ok && url.origin === self.location.origin) {
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
