@@ -41,6 +41,7 @@ const els = {
   pdfMsg: document.getElementById("pdfMsg"),
   scanCameraBtn: document.getElementById("scanCameraBtn"),
   scanGalleryBtn: document.getElementById("scanGalleryBtn"),
+  scanLiveBtn: document.getElementById("scanLiveBtn"),
   scanFileInput: document.getElementById("scanFileInput"),
   scanGalleryInput: document.getElementById("scanGalleryInput"),
   scanStatus: document.getElementById("scanStatus"),
@@ -49,6 +50,7 @@ const els = {
   scanLiveStatus: document.getElementById("scanLiveStatus"),
   listText: document.getElementById("listText"),
   listScanBtn: document.getElementById("listScanBtn"),
+  listPasteBtn: document.getElementById("listPasteBtn"),
   listCameraBtn: document.getElementById("listCameraBtn"),
   listGalleryBtn: document.getElementById("listGalleryBtn"),
   listFileInput: document.getElementById("listFileInput"),
@@ -58,6 +60,7 @@ const els = {
   missingList: document.getElementById("missingList"),
   installHint: document.getElementById("installHint"),
   installBtn: document.getElementById("installBtn"),
+  installHintText: document.getElementById("installHintText"),
   desktopBtn: document.getElementById("desktopBtn"),
   desktopMsg: document.getElementById("desktopMsg"),
   tabSearch: document.getElementById("tabSearch"),
@@ -143,8 +146,19 @@ function cartGrandTotal() {
 
 function selectedCity() {
   const fallback = { id: "ankara-cankaya", label: "Ankara · Çankaya", lat: 39.9208, lon: 32.8541 };
-  if (!state.cities?.length) return fallback;
-  return state.cities.find((c) => c.id === els.city?.value) || state.cities[0] || fallback;
+  const presets = state.cities?.length
+    ? state.cities
+    : [
+        { id: "ankara-kecioren", label: "Ankara · Keçiören", lat: 39.9777, lon: 32.867 },
+        { id: "ankara-cankaya", label: "Ankara · Çankaya", lat: 39.9208, lon: 32.8541 },
+        { id: "ankara-yenimahalle", label: "Ankara · Yenimahalle", lat: 39.9667, lon: 32.8111 },
+        { id: "ankara-mamak", label: "Ankara · Mamak", lat: 39.92, lon: 32.91 },
+        { id: "ankara-etimesgut", label: "Ankara · Etimesgut", lat: 39.95, lon: 32.67 },
+        { id: "ankara-sincan", label: "Ankara · Sincan", lat: 39.966, lon: 32.58 },
+        { id: "ankara-pursaklar", label: "Ankara · Pursaklar", lat: 40.04, lon: 32.9 },
+      ];
+  const id = els.city?.value;
+  return presets.find((c) => c.id === id) || presets[0] || fallback;
 }
 
 function dismissKeyboard() {
@@ -166,32 +180,54 @@ function registerPwa() {
 }
 
 function setupInstall() {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  if (els.installHint) els.installHint.hidden = !!isStandalone;
+  if (isStandalone) return;
+
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     state.deferredPrompt = e;
-    els.installHint.hidden = false;
+    if (els.installHint) els.installHint.hidden = false;
+    if (els.installHintText) {
+      els.installHintText.textContent = "Hazır — Telefona yükle’ye basın";
+    }
   });
 
   els.installBtn?.addEventListener("click", async () => {
-    if (!state.deferredPrompt) return;
-    state.deferredPrompt.prompt();
-    await state.deferredPrompt.userChoice;
-    state.deferredPrompt = null;
-    els.installHint.hidden = true;
+    if (state.deferredPrompt) {
+      try {
+        state.deferredPrompt.prompt();
+        await state.deferredPrompt.userChoice;
+      } catch {
+        /* ignore */
+      }
+      state.deferredPrompt = null;
+      if (els.installHintText) {
+        els.installHintText.textContent = "Yükleme penceresi açıldı / tamamlandı";
+      }
+      return;
+    }
+    if (isIos) {
+      alert(
+        "iPhone/iPad: Safari’de alttaki Paylaş (kare+ok) → “Ana Ekrana Ekle” → Ekle.\n\nAGT MARKET KARŞILAŞTIRMA ana ekranınıza gelir."
+      );
+      return;
+    }
+    if (isAndroid) {
+      alert(
+        "Android Chrome: sağ üst ⋮ menü → “Ana ekrana ekle” veya “Uygulamayı yükle”.\n\nMenüde yoksa bu sayfayı Chrome ile açıp tekrar deneyin."
+      );
+      return;
+    }
+    alert(
+      "Tarayıcı menüsünden “Uygulamayı yükle / Ana ekrana ekle” seçin.\nWindows’ta Chrome adres çubuğundaki bilgisayar+ikonuna da basabilirsiniz."
+    );
   });
-
-  // iOS Safari: show soft tip
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone;
-  if (isIos && !isStandalone) {
-    els.installHint.hidden = false;
-    els.installBtn.textContent = "Ana ekrana ekle";
-    els.installBtn.onclick = () => {
-      alert("Safari’de Paylaş → Ana Ekrana Ekle ile AGT MARKET KARŞILAŞTIRMA’yı yükleyebilirsiniz.");
-    };
-  }
 }
 
 async function boot() {
@@ -236,10 +272,12 @@ async function boot() {
     ];
   }
 
-  if (els.city) {
-    els.city.innerHTML = (state.cities || [])
+  if (els.city && (state.cities || []).length) {
+    const prev = els.city.value || "ankara-cankaya";
+    els.city.innerHTML = state.cities
       .map((c) => `<option value="${c.id}">${c.label}</option>`)
       .join("");
+    if ([...els.city.options].some((o) => o.value === prev)) els.city.value = prev;
   }
 
   if (els.chips) {
@@ -503,6 +541,8 @@ function offerByIdxOrId(el) {
   if (Number.isFinite(idx) && idx >= 0) return state.offers[idx] || null;
   return null;
 }
+
+function openProductModal(open) {
   if (!els.productModal) return;
   els.productModal.hidden = !open;
   els.productModal.setAttribute("aria-hidden", open ? "false" : "true");
@@ -1271,18 +1311,10 @@ async function stopLiveScanner() {
   }
 }
 
-els.scanCameraBtn?.addEventListener("click", () => {
-  // Mobilde önce capture ile doğrudan kamera; masaüstünde canlı tarayıcı
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (isMobile && els.scanFileInput) {
-    els.scanFileInput.click();
-  } else {
-    openLiveScanner();
-  }
-});
-
-els.scanGalleryBtn?.addEventListener("click", () => {
-  els.scanGalleryInput?.click();
+els.scanLiveBtn?.addEventListener("click", () => {
+  openLiveScanner().catch((err) => {
+    setScanStatus(err?.message || "Canlı tarayıcı açılamadı", false);
+  });
 });
 
 els.scanFileInput?.addEventListener("change", (e) => {
@@ -1437,8 +1469,33 @@ async function ocrListImage(file) {
 }
 
 els.listScanBtn?.addEventListener("click", () => runListScan(els.listText?.value || ""));
-els.listCameraBtn?.addEventListener("click", () => els.listFileInput?.click());
-els.listGalleryBtn?.addEventListener("click", () => els.listGalleryInput?.click());
+
+els.listPasteBtn?.addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text?.trim()) {
+      setListStatus("Pano boş. Önce listeyi kopyalayın.", false);
+      return;
+    }
+    const cur = (els.listText?.value || "").trim();
+    els.listText.value = cur ? `${cur}\n${text.trim()}` : text.trim();
+    setListStatus("Liste panodan yapıştırıldı. “Listeyi tara”ya basın.", false);
+    els.listText?.focus();
+  } catch {
+    els.listText?.focus();
+    setListStatus(
+      "Otomatik yapıştırma engelli. Kutuya dokunup Yapıştır / Ctrl+V / uzun bas kullanın.",
+      false
+    );
+  }
+});
+
+els.listText?.addEventListener("paste", () => {
+  setTimeout(() => {
+    setListStatus("Yapıştırıldı. “Listeyi tara ve sepetlere ekle”ye basın.", false);
+  }, 0);
+});
+
 els.listFileInput?.addEventListener("change", (e) => {
   const f = e.target.files?.[0];
   if (f) ocrListImage(f);
@@ -1471,7 +1528,7 @@ els.scanModal?.addEventListener("click", (e) => {
   if (e.target === els.scanModal) stopLiveScanner();
 });
 
-els.offerList.addEventListener("click", (e) => {
+els.offerList?.addEventListener("click", (e) => {
   const btn = e.target.closest(".add-btn");
   if (btn) {
     e.preventDefault();
@@ -1490,7 +1547,7 @@ els.offerList.addEventListener("click", (e) => {
   }
 });
 
-els.offerList.addEventListener("keydown", (e) => {
+els.offerList?.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const row = e.target.closest("[data-offer-id]");
   if (!row || e.target.closest("button")) return;
@@ -1534,7 +1591,7 @@ els.viewToggle?.addEventListener("click", (e) => {
   paintOffers();
 });
 
-els.cartPanels.addEventListener("click", (e) => {
+els.cartPanels?.addEventListener("click", (e) => {
   const removeBtn = e.target.closest(".remove-item-btn");
   if (removeBtn) {
     removeFromCart(removeBtn.dataset.market, removeBtn.dataset.id);

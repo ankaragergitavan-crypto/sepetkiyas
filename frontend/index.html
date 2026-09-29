@@ -79,35 +79,44 @@
           />
           <div class="city-field">
             <label for="city">Ankara ilçe</label>
-            <select id="city" name="city" aria-label="Ankara ilçe seçin"></select>
+            <select id="city" name="city" aria-label="Ankara ilçe seçin">
+              <option value="ankara-kecioren">Ankara · Keçiören</option>
+              <option value="ankara-cankaya" selected>Ankara · Çankaya</option>
+              <option value="ankara-yenimahalle">Ankara · Yenimahalle</option>
+              <option value="ankara-mamak">Ankara · Mamak</option>
+              <option value="ankara-etimesgut">Ankara · Etimesgut</option>
+              <option value="ankara-sincan">Ankara · Sincan</option>
+              <option value="ankara-pursaklar">Ankara · Pursaklar</option>
+            </select>
           </div>
           <button type="submit" id="searchBtn">Ara / Karşılaştır</button>
         </form>
 
         <div class="scan-tools" aria-label="Görüntü ile ara">
-          <button type="button" class="scan-btn" id="scanCameraBtn">Kamera ile ürün tara</button>
-          <button type="button" class="scan-btn" id="scanGalleryBtn">Galeriden ürün seç</button>
+          <label class="scan-btn file-btn" for="scanFileInput">Kamera ile ürün tara</label>
           <input
             id="scanFileInput"
             type="file"
             accept="image/*"
             capture="environment"
-            hidden
+            class="sr-file"
           />
+          <label class="scan-btn file-btn" for="scanGalleryInput">Galeriden ürün seç</label>
           <input
             id="scanGalleryInput"
             type="file"
             accept="image/*"
-            hidden
+            class="sr-file"
           />
+          <button type="button" class="scan-btn" id="scanLiveBtn">Canlı barkod tara</button>
         </div>
         <p class="muted tiny scan-status" id="scanStatus" hidden></p>
 
         <section class="list-panel" aria-label="Alışveriş listesi">
           <h2 class="list-panel-title">Alışveriş listesi tara</h2>
           <p class="muted tiny list-panel-hint">
-            En fazla 40 satır yazın veya liste fotoğrafı yükleyin. Her satır tüm marketlerde
-            taranır: önce aynı ürün (marka + kg/adet), sonra en ucuz → o market sepetine eklenir.
+            En fazla 40 satır yazın, panodan yapıştırın veya liste fotoğrafı yükleyin. Her satır
+            tüm marketlerde taranır: aynı ürün (marka + kg/adet) + en ucuz → market sepeti.
             Bulunamayanlar altta; yanında benzer, istersen ekle.
           </p>
           <textarea
@@ -117,10 +126,11 @@
           ></textarea>
           <div class="list-actions">
             <button type="button" class="primary-btn" id="listScanBtn">Listeyi tara ve sepetlere ekle</button>
-            <button type="button" class="scan-btn" id="listCameraBtn">Liste fotoğrafı (kamera)</button>
-            <button type="button" class="scan-btn" id="listGalleryBtn">Liste fotoğrafı (galeri)</button>
-            <input id="listFileInput" type="file" accept="image/*" capture="environment" hidden />
-            <input id="listGalleryInput" type="file" accept="image/*" hidden />
+            <button type="button" class="scan-btn" id="listPasteBtn">Panodan yapıştır</button>
+            <label class="scan-btn file-btn" for="listFileInput">Liste fotoğrafı (kamera)</label>
+            <input id="listFileInput" type="file" accept="image/*" capture="environment" class="sr-file" />
+            <label class="scan-btn file-btn" for="listGalleryInput">Liste fotoğrafı (galeri)</label>
+            <input id="listGalleryInput" type="file" accept="image/*" class="sr-file" />
           </div>
           <p class="muted tiny" id="listScanStatus" hidden></p>
         </section>
@@ -132,9 +142,9 @@
           <a class="ghost-btn linkish" id="downloadUrlBtn" href="/api/desktop-shortcut">.url indir</a>
           <span class="muted" id="desktopMsg"></span>
         </div>
-        <p class="install-hint" id="installHint" hidden>
-          <button type="button" class="ghost-btn" id="installBtn">Uygulamayı yükle</button>
-          <span class="muted">Ana ekrana ekle — Android / iOS / PC</span>
+        <p class="install-hint" id="installHint">
+          <button type="button" class="ghost-btn" id="installBtn">Telefona yükle</button>
+          <span class="muted" id="installHintText">Ana ekrana ekle — Android / iOS / PC</span>
         </p>
       </section>
 
@@ -232,6 +242,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js" type="module"></script>
+    <script src="/static/app.js?v=17" defer></script>
   </body>
 </html>
