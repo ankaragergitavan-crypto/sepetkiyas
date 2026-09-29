@@ -39,54 +39,27 @@ const els = {
   tabCart: document.getElementById("tabCart"),
   liveTimer: document.getElementById("liveTimer"),
   liveTimerValue: document.getElementById("liveTimerValue"),
-  liveTimerMeta: document.getElementById("liveTimerMeta"),
   quickQueries: document.getElementById("quickQueries"),
 };
-
-let timerUntil = 0;
-
-function formatMmSs(totalSec) {
-  const s = Math.max(0, Math.floor(totalSec));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
-}
-
-function paintTimer() {
-  if (!els.liveTimerValue) return;
-  const left = Math.max(0, (timerUntil - Date.now()) / 1000);
-  els.liveTimerValue.textContent = formatMmSs(left);
-  els.liveTimer?.classList.toggle("urgent", left > 0 && left < 120);
-  els.liveTimer?.classList.toggle("asleep", left <= 0);
-}
 
 async function syncTimer() {
   try {
     const res = await fetch("/api/timer", { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
-    timerUntil = Date.now() + (data.secondsUntilSleep || 0) * 1000;
-    if (els.liveTimerMeta) {
-      const hrs = data.freeHoursPerMonth ?? 750;
-      const renew = data.renewsOn || "";
-      els.liveTimerMeta.textContent = renew
-        ? `${hrs}s/ay · ${renew}`
-        : `${hrs}s/ay`;
-      els.liveTimer?.setAttribute("title", data.note || "");
-    }
-    paintTimer();
+    const hrs = Math.round(data.freeHoursPerMonth ?? 750);
+    if (els.liveTimerValue) els.liveTimerValue.textContent = `${hrs} saat`;
+    els.liveTimer?.setAttribute(
+      "title",
+      data.note || `Ücretsiz kota: ayda ${hrs} saat. Her ayın 1'inde yenilenir.`
+    );
   } catch {
     /* ignore */
   }
 }
 
 function startTimerLoop() {
-  // Sık sunucu ping'i ücretsiz saati yer — sadece açılış + arama + sekme dönüşü.
   syncTimer();
-  setInterval(paintTimer, 1000);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) syncTimer();
-  });
 }
 
 function loadCarts() {
@@ -343,6 +316,65 @@ function scoreRow(label, score) {
     </div>`;
 }
 
+function trendBadge(o) {
+  if (!o.trend || o.trend === "flat") return "";
+  const down = o.trend === "down";
+  const pct =
+    o.priceDeltaPct != null
+      ? ` ${down ? "" : "+"}${o.priceDeltaPct}%`
+      : "";
+  const prev =
+    o.prevPrice != null ? ` (önce ${money(o.prevPrice)})` : "";
+  return `<span class="trend-badge ${down ? "down" : "up"}" title="Gerçek önceki kayıt${prev}">${
+    down ? "↓ düştü" : "↑ yükseldi"
+  }${pct}</span>`;
+}
+
+function mergeLocalPriceHistory(offers) {
+  let hist = {};
+  try {
+    hist = JSON.parse(localStorage.getItem("sepetkiyas.prices") || "{}");
+  } catch {
+    hist = {};
+  }
+  for (const o of offers) {
+    const key = `${o.productId || o.id}|${o.depotId || o.marketId || ""}`;
+    const prev = hist[key];
+    if (!o.trend && prev && typeof prev.price === "number") {
+      const delta = Number(o.price) - prev.price;
+      if (Math.abs(delta) < 0.005) {
+        o.trend = "flat";
+        o.priceDelta = 0;
+        o.priceDeltaPct = 0;
+        o.prevPrice = prev.price;
+      } else {
+        o.trend = delta > 0 ? "up" : "down";
+        o.priceDelta = Math.round(delta * 100) / 100;
+        o.priceDeltaPct =
+          prev.price !== 0
+            ? Math.round((delta / prev.price) * 10000) / 100
+            : null;
+        o.prevPrice = prev.price;
+      }
+    }
+    hist[key] = { price: Number(o.price), ts: Date.now() };
+  }
+  try {
+    const keys = Object.keys(hist);
+    if (keys.length > 4000) {
+      const trimmed = {};
+      keys.slice(-3000).forEach((k) => {
+        trimmed[k] = hist[k];
+      });
+      hist = trimmed;
+    }
+    localStorage.setItem("sepetkiyas.prices", JSON.stringify(hist));
+  } catch {
+    /* quota */
+  }
+  return offers;
+}
+
 function paintOffers() {
   const offers = visibleOffers();
   if (!offers.length) {
@@ -358,7 +390,7 @@ function paintOffers() {
         ? `<img src="${o.imageUrl}" alt="" loading="lazy" />`
         : `<div style="width:72px;height:72px;border-radius:12px;background:#0b140f"></div>`;
       const valueBadge = o.valuePick
-        ? `<span class="value-badge">Uygun fiyat + kaliteli</span>`
+        ? `<span class="value-badge">Tahmin: uygun fiyat + sade etiket</span>`
         : "";
       return `
         <article class="offer ${o.valuePick ? "value-pick" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
@@ -373,14 +405,18 @@ function paintOffers() {
               ${o.depotName ? `<span>${escapeHtml(o.depotName)}</span>` : ""}
               ${o.unitPrice ? `<span>${escapeHtml(o.unitPrice)}</span>` : ""}
               ${o.updatedAt ? `<span>güncelleme ${escapeHtml(o.updatedAt)}</span>` : ""}
+              ${o.discount ? `<span class="pill-discount">kaynak: indirimli</span>` : ""}
             </div>
-            <div class="score-bars" title="Tahmini skorlar — tıbbi tavsiye değildir">
-              ${scoreRow("Sağlık", o.healthScore)}
+            <div class="score-bars" title="Etiket/fiyat tahmini — resmi sağlık skoru değil">
+              ${scoreRow("Etiket", o.healthScore)}
               ${scoreRow("Fiyat", o.economyScore)}
             </div>
           </div>
           <div class="offer-side">
-            <div class="price">${money(o.price)}</div>
+            <div class="price-wrap">
+              <div class="price">${money(o.price)}</div>
+              ${trendBadge(o)}
+            </div>
             <button class="add-btn" data-idx="${realIdx}">Sepete ekle</button>
           </div>
         </article>`;
@@ -422,8 +458,8 @@ function renderRobot(robot) {
       <span class="market-badge"><i style="background:${o.marketColor || "#999"}"></i>${escapeHtml(o.marketLabel)}</span>
       <strong class="robot-price">${money(o.price)}</strong>
       ${o.volume ? `<span>${escapeHtml(o.volume)}</span>` : ""}
-      <span>ekonomi ${pick.economyScore}/100</span>
-      <span>sağlık ${pick.healthScore}/100</span>
+      <span>etiket ${pick.healthScore}/100</span>
+      <span>fiyat ${pick.economyScore}/100</span>
     </div>
     ${alt ? `<div class="robot-alts">Alternatif: ${alt}</div>` : ""}
     <p class="robot-disclaimer">${escapeHtml(robot.disclaimer || "")}</p>
@@ -436,7 +472,7 @@ function renderRobot(robot) {
 }
 
 function renderOffers(payload) {
-  state.offers = payload.offers || [];
+  state.offers = mergeLocalPriceHistory(payload.offers || []);
   state.activeVolume = "all";
   els.emptyState.hidden = true;
   els.resultsSection.hidden = false;
@@ -463,6 +499,9 @@ function renderOffers(payload) {
     pills.push(
       `<span class="pill warn">${escapeHtml(m.label)}: açık API yok</span>`
     );
+  }
+  if (payload.dataPolicy?.livePricesOnly) {
+    pills.push(`<span class="pill">canlı veri · uydurma yok</span>`);
   }
   els.statusRow.innerHTML = pills.join("");
 

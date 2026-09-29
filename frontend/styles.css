@@ -152,22 +152,8 @@ main,
   font-family: var(--display);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--accent);
-}
-
-.live-timer-meta {
-  font-size: 0.62rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.live-timer.urgent .live-timer-value {
-  color: var(--accent-2);
-}
-
-.live-timer.asleep .live-timer-value {
-  color: var(--danger);
 }
 
 .cart-toggle,
@@ -596,6 +582,36 @@ main {
   text-align: right;
   color: var(--ink);
   opacity: 0.85;
+}
+
+.price-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.trend-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+  white-space: nowrap;
+}
+
+.trend-badge.down {
+  color: #062015;
+  background: rgba(125, 255, 179, 0.85);
+}
+
+.trend-badge.up {
+  color: #fff;
+  background: rgba(255, 107, 107, 0.9);
+}
+
+.pill-discount {
+  color: var(--accent-2);
+  font-size: 0.75rem;
 }
 
 .offer {

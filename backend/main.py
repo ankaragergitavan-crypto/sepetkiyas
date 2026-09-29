@@ -25,6 +25,7 @@ from .markets import (
 )
 from .relevance import is_relevant, relevance_score
 from .robot import build_robot_pick
+from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -240,6 +241,9 @@ async def search(body: SearchBody) -> dict[str, Any]:
         result["offers"] = filter_offers_by_volume(result["offers"], body.volume)
         result["offerCount"] = len(result["offers"])
 
+    # Gerçek fiyat değişimi (önceki arama kaydı); yoksa ok yok
+    apply_price_trends(result["offers"])
+
     robot = build_robot_pick(result["offers"], query)
 
     sources = [result.get("source", "marketfiyati.org.tr")]
@@ -254,6 +258,12 @@ async def search(body: SearchBody) -> dict[str, Any]:
         "getir": getir_status,
         "robot": robot,
         "sorted": "price_asc",
+        "dataPolicy": {
+            "livePricesOnly": True,
+            "noFabricatedOffers": True,
+            "trendsRequirePriorObservation": True,
+            "note": "Yalnızca canlı kaynak fiyatı; uydurma teklif/trend yok.",
+        },
     }
 
 

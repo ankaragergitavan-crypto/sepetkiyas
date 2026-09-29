@@ -26,15 +26,7 @@ MARKETS: tuple[MarketMeta, ...] = (
         "marketfiyati",
     ),
     MarketMeta("getir_buyuk", "Getir", ("getir_buyuk", "getirbuyuk", "getir"), "#5D3EBC", "getir"),
-    # Açık canlı fiyat kaynağı yok — listede görünür, sonuç boş kalır.
-    MarketMeta("yunus", "Yunus", ("yunus", "yunus_market"), "#E87722", "pending"),
-    MarketMeta(
-        "trendyol_go",
-        "Trendyol Go",
-        ("trendyol_go", "trendyolgo", "trendyol"),
-        "#F27A1A",
-        "pending",
-    ),
+    # Yunus / Trendyol Go: açık canlı API yok — listeye eklenmez (sahte sonuç yok).
 )
 
 MARKET_BY_ID = {m.id: m for m in MARKETS}

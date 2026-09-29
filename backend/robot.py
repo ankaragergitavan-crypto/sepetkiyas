@@ -138,6 +138,8 @@ def annotate_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "healthReasons": h_reasons[:2],
             "economyReason": e_reason,
         }
+        # Şeffaflık: skorlar canlı fiyattan + etiket metninden türetilir; lab sonucu değil
+        o["scoreKind"] = "heuristic_from_live_price_and_title"
     return offers
 
 
@@ -177,9 +179,10 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
                 "reasons": why,
                 "summary": (
                     (
-                        "Uygun fiyatlı ve daha kaliteli/sade profil dengesiyle öne çıktı."
+                        "Canlı fiyatta uygun ve etiket metnine göre daha sade ürün dengesi "
+                        "(tahmin; laboratuvar/sağlık iddiası değil)."
                         if o.get("valuePick")
-                        else f"Ekonomik ({e_score}/100) ve sağlık profili ({h_score}/100) dengesiyle öne çıktı."
+                        else f"Canlı birim fiyat ({e_score}/100) + etiket tahmini ({h_score}/100) dengesi."
                     )
                 ),
             }
@@ -199,7 +202,7 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
         "pick": top,
         "alternatives": alts,
         "disclaimer": (
-            "Kıyas robotu etiket adına ve fiyata göre tahmin yapar; "
-            "tıbbi tavsiye değildir. İçerik için ambalajı kontrol edin."
+            "Fiyatlar canlı kaynaktan gelir. Robot skoru etiket adı + birim fiyata göre tahmindir; "
+            "tıbbi/resmi kalite belgesi değildir. Sahte fiyat üretilmez."
         ),
     }
