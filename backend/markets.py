@@ -18,7 +18,23 @@ MARKETS: tuple[MarketMeta, ...] = (
     MarketMeta("sok", "Şok", ("sok",), "#FFD100", "marketfiyati"),
     MarketMeta("tarim_kredi", "Tarım Kredi", ("tarim_kredi",), "#2E7D32", "marketfiyati"),
     MarketMeta("bim", "BİM", ("bim",), "#E30613", "marketfiyati"),
+    MarketMeta(
+        "carrefour",
+        "CarrefourSA",
+        ("carrefour", "carrefoursa", "carrefour_sa"),
+        "#005CA9",
+        "marketfiyati",
+    ),
     MarketMeta("getir_buyuk", "Getir", ("getir_buyuk", "getirbuyuk", "getir"), "#5D3EBC", "getir"),
+    # Açık canlı fiyat kaynağı yok — listede görünür, sonuç boş kalır.
+    MarketMeta("yunus", "Yunus", ("yunus", "yunus_market"), "#E87722", "pending"),
+    MarketMeta(
+        "trendyol_go",
+        "Trendyol Go",
+        ("trendyol_go", "trendyolgo", "trendyol"),
+        "#F27A1A",
+        "pending",
+    ),
 )
 
 MARKET_BY_ID = {m.id: m for m in MARKETS}

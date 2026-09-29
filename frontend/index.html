@@ -39,18 +39,29 @@
         <span class="brand-mark">SK</span>
         <span class="brand-text">SepetKıyas</span>
       </a>
-      <button type="button" class="cart-toggle" id="cartToggle" aria-expanded="false">
-        Sepetler
-        <span class="cart-badge" id="cartBadge">0</span>
-      </button>
+      <div class="topbar-right">
+        <div
+          class="live-timer"
+          id="liveTimer"
+          title="Uyku öncesi kalan süre. Aylık 750 saat her ayın 1'inde yenilenir."
+        >
+          <span class="live-timer-label">Kalan</span>
+          <span class="live-timer-value" id="liveTimerValue">--:--</span>
+          <span class="live-timer-meta" id="liveTimerMeta">750s/ay</span>
+        </div>
+        <button type="button" class="cart-toggle" id="cartToggle" aria-expanded="false">
+          Sepetler
+          <span class="cart-badge" id="cartBadge">0</span>
+        </button>
+      </div>
     </header>
 
     <main>
       <section class="hero">
         <p class="hero-brand">SepetKıyas</p>
-        <h1>Aynı ürün, altı market, canlı fiyat.</h1>
+        <h1>Aynı ürün, çok market, canlı fiyat.</h1>
         <p class="hero-sub">
-          A101, Migros, Şok, Tarım Kredi, BİM ve Getir’de ara (yalnızca
+          A101, Migros, Şok, BİM, Tarım Kredi, CarrefourSA ve Getir’de ara (yalnızca
           <strong>Ankara</strong>). En ucuzdan pahalıya sırala; her market için ayrı sepet tut.
         </p>
 
@@ -71,6 +82,7 @@
           <button type="submit" id="searchBtn">Karşılaştır</button>
         </form>
 
+        <div class="quick-queries" id="quickQueries" aria-label="Hızlı aramalar"></div>
         <div class="market-chips" id="marketChips"></div>
         <div class="desktop-actions">
           <button type="button" class="ghost-btn" id="desktopBtn">Masaüstüne kısayol ekle</button>
@@ -93,6 +105,7 @@
         </div>
         <div class="volume-row" id="volumeRow" hidden></div>
         <div class="status-row" id="statusRow"></div>
+        <div class="robot-card" id="robotCard" hidden></div>
         <div class="offer-list" id="offerList"></div>
       </section>
 

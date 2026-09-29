@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response as FastAPIResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .aktuel import fetch_all_aktuels
 from .client import search_marketfiyati
@@ -22,13 +24,62 @@ from .markets import (
     clamp_to_ankara,
 )
 from .relevance import is_relevant, relevance_score
+from .robot import build_robot_pick
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
 
-app = FastAPI(title="SepetKıyas", version="1.2.0")
+# Render free: ~15 dk işlem yoksa uyur. Sayaç her istekte sıfırlanır.
+SLEEP_AFTER_SECONDS = int(os.getenv("SLEEP_AFTER_SECONDS", "900"))
+FREE_HOURS_PER_MONTH = float(os.getenv("FREE_HOURS_PER_MONTH", "750"))
+_last_activity = time.monotonic()
+_awake_started = time.monotonic()
 
+
+def touch_activity() -> None:
+    global _last_activity
+    _last_activity = time.monotonic()
+
+
+def timer_payload() -> dict[str, Any]:
+    now = time.monotonic()
+    idle = max(0.0, now - _last_activity)
+    until_sleep = max(0, int(SLEEP_AFTER_SECONDS - idle))
+    session_hours = (now - _awake_started) / 3600.0
+    # Takvim ayı: kota her ayın 1'inde 750'ye sıfırlanır (Render free).
+    y, m, _ = time.localtime()[:3]
+    if m == 12:
+        renew_y, renew_m = y + 1, 1
+    else:
+        renew_y, renew_m = y, m + 1
+    return {
+        "sleepAfterSeconds": SLEEP_AFTER_SECONDS,
+        "secondsUntilSleep": until_sleep,
+        "idleSeconds": int(idle),
+        "sessionHours": round(session_hours, 3),
+        "freeHoursPerMonth": FREE_HOURS_PER_MONTH,
+        "renewsMonthly": True,
+        "renewsOn": f"{renew_y:04d}-{renew_m:02d}-01",
+        "label": "Aktif kalan",
+        "note": (
+            "İşlem yoksa ~15 dk sonra uyur (uyurken saat sayılmaz). "
+            f"Aylık ücretsiz kota {FREE_HOURS_PER_MONTH:.0f} saat; "
+            f"her ayın 1'inde yenilenir ({renew_y:04d}-{renew_m:02d}-01). "
+            "Kota bitince ay sonuna kadar kilitlenir — Render Billing'den bak."
+        ),
+    }
+
+
+class ActivityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable) -> FastAPIResponse:
+        touch_activity()
+        return await call_next(request)
+
+
+app = FastAPI(title="SepetKıyas", version="1.3.0")
+
+app.add_middleware(ActivityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -54,7 +105,24 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "platforms": ["web", "android", "ios", "desktop"],
         "getir": "carsi_live_optional_reef",
+        "timer": timer_payload(),
     }
+
+
+@app.get("/api/timer")
+async def timer() -> dict[str, Any]:
+    """Bağlanan herkese kalan aktif süre (uyku öncesi)."""
+    return timer_payload()
+
+
+def _market_hint(m: Any) -> str | None:
+    if m.id == "getir_buyuk":
+        return "Getir ağı · Çarşı (konumlu). Büyük depo için REEF_API_KEY."
+    if m.id == "carrefour":
+        return "marketfiyati.org.tr canlı (CarrefourSA)."
+    if m.source == "pending":
+        return "Henüz açık canlı fiyat API’si yok; listede görünür, sonuç gelmez."
+    return None
 
 
 @app.get("/api/markets")
@@ -65,15 +133,21 @@ async def markets() -> dict[str, Any]:
                 "id": m.id,
                 "label": "Getir Çarşı" if m.id == "getir_buyuk" else m.label,
                 "color": m.color,
-                "live": True,
+                "live": m.source in ("marketfiyati", "getir"),
                 "source": m.source,
-                "hint": (
-                    "Getir ağı · Çarşı (konumlu). Büyük depo için REEF_API_KEY."
-                    if m.id == "getir_buyuk"
-                    else None
-                ),
+                "hint": _market_hint(m),
             }
             for m in MARKETS
+        ],
+        "quickQueries": [
+            "süt 1L",
+            "yumurta 30",
+            "ekmek",
+            "kaşar 500g",
+            "ayçiçek yağı",
+            "tuz",
+            "domates",
+            "tavuk göğüs",
         ],
         "cities": CITY_PRESETS,
         "defaults": {
@@ -92,7 +166,8 @@ async def search(body: SearchBody) -> dict[str, Any]:
 
     # Sadece Ankara konumları
     lat, lon = clamp_to_ankara(body.latitude, body.longitude)
-    distance = min(body.distance, 12)
+    # CarrefourSA şubeleri biraz daha uzak olabilir
+    distance = min(max(body.distance, 8), 15)
 
     selected = body.markets
     marketfiyati_ids = [m.id for m in MARKETS if m.source == "marketfiyati"]
@@ -165,6 +240,8 @@ async def search(body: SearchBody) -> dict[str, Any]:
         result["offers"] = filter_offers_by_volume(result["offers"], body.volume)
         result["offerCount"] = len(result["offers"])
 
+    robot = build_robot_pick(result["offers"], query)
+
     sources = [result.get("source", "marketfiyati.org.tr")]
     if getir_status and getir_status.get("available"):
         sources.append(getir_status.get("channelLabel") or "Getir")
@@ -175,6 +252,7 @@ async def search(body: SearchBody) -> dict[str, Any]:
         "volumeOptions": volumes,
         "activeVolume": body.volume,
         "getir": getir_status,
+        "robot": robot,
         "sorted": "price_asc",
     }
 

@@ -19,6 +19,7 @@ const els = {
   resultsTitle: document.getElementById("resultsTitle"),
   resultsMeta: document.getElementById("resultsMeta"),
   statusRow: document.getElementById("statusRow"),
+  robotCard: document.getElementById("robotCard"),
   volumeRow: document.getElementById("volumeRow"),
   offerList: document.getElementById("offerList"),
   cartToggle: document.getElementById("cartToggle"),
@@ -36,7 +37,57 @@ const els = {
   desktopMsg: document.getElementById("desktopMsg"),
   tabSearch: document.getElementById("tabSearch"),
   tabCart: document.getElementById("tabCart"),
+  liveTimer: document.getElementById("liveTimer"),
+  liveTimerValue: document.getElementById("liveTimerValue"),
+  liveTimerMeta: document.getElementById("liveTimerMeta"),
+  quickQueries: document.getElementById("quickQueries"),
 };
+
+let timerUntil = 0;
+
+function formatMmSs(totalSec) {
+  const s = Math.max(0, Math.floor(totalSec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
+function paintTimer() {
+  if (!els.liveTimerValue) return;
+  const left = Math.max(0, (timerUntil - Date.now()) / 1000);
+  els.liveTimerValue.textContent = formatMmSs(left);
+  els.liveTimer?.classList.toggle("urgent", left > 0 && left < 120);
+  els.liveTimer?.classList.toggle("asleep", left <= 0);
+}
+
+async function syncTimer() {
+  try {
+    const res = await fetch("/api/timer", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    timerUntil = Date.now() + (data.secondsUntilSleep || 0) * 1000;
+    if (els.liveTimerMeta) {
+      const hrs = data.freeHoursPerMonth ?? 750;
+      const renew = data.renewsOn || "";
+      els.liveTimerMeta.textContent = renew
+        ? `${hrs}s/ay · ${renew}`
+        : `${hrs}s/ay`;
+      els.liveTimer?.setAttribute("title", data.note || "");
+    }
+    paintTimer();
+  } catch {
+    /* ignore */
+  }
+}
+
+function startTimerLoop() {
+  // Sık sunucu ping'i ücretsiz saati yer — sadece açılış + arama + sekme dönüşü.
+  syncTimer();
+  setInterval(paintTimer, 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) syncTimer();
+  });
+}
 
 function loadCarts() {
   try {
@@ -112,6 +163,7 @@ function setupInstall() {
 async function boot() {
   registerPwa();
   setupInstall();
+  startTimerLoop();
 
   if (new URLSearchParams(location.search).get("focus") === "search") {
     els.query.focus();
@@ -125,6 +177,16 @@ async function boot() {
   els.city.innerHTML = state.cities
     .map((c) => `<option value="${c.id}">${c.label}</option>`)
     .join("");
+
+  if (els.quickQueries) {
+    const qs = data.quickQueries || [];
+    els.quickQueries.innerHTML = qs
+      .map(
+        (q) =>
+          `<button type="button" class="quick-chip" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`
+      )
+      .join("");
+  }
 
   els.chips.innerHTML = state.markets
     .map(
@@ -307,6 +369,53 @@ function paintOffers() {
     .join("");
 }
 
+function renderRobot(robot) {
+  if (!els.robotCard) return;
+  if (!robot?.pick?.offer) {
+    els.robotCard.hidden = true;
+    els.robotCard.innerHTML = "";
+    return;
+  }
+  const pick = robot.pick;
+  const o = pick.offer;
+  const reasons = (pick.reasons || [])
+    .map((r) => `<li>${escapeHtml(r)}</li>`)
+    .join("");
+  const alt = (robot.alternatives || [])
+    .map(
+      (a) =>
+        `<span class="robot-alt">${escapeHtml(a.offer.marketLabel)} · ${money(a.offer.price)}</span>`
+    )
+    .join("");
+  const idx = state.offers.findIndex(
+    (x) => x.id === o.id || (x.title === o.title && x.marketId === o.marketId && x.price === o.price)
+  );
+  els.robotCard.hidden = false;
+  els.robotCard.innerHTML = `
+    <div class="robot-head">
+      <span class="robot-badge">Kıyas robotu</span>
+      <span class="robot-score">skor ${pick.score}</span>
+    </div>
+    <p class="robot-title">${escapeHtml(o.title)}</p>
+    <p class="robot-summary">${escapeHtml(pick.summary || "")}</p>
+    <ul class="robot-reasons">${reasons}</ul>
+    <div class="robot-meta">
+      <span class="market-badge"><i style="background:${o.marketColor || "#999"}"></i>${escapeHtml(o.marketLabel)}</span>
+      <strong class="robot-price">${money(o.price)}</strong>
+      ${o.volume ? `<span>${escapeHtml(o.volume)}</span>` : ""}
+      <span>ekonomi ${pick.economyScore}/100</span>
+      <span>sağlık ${pick.healthScore}/100</span>
+    </div>
+    ${alt ? `<div class="robot-alts">Alternatif: ${alt}</div>` : ""}
+    <p class="robot-disclaimer">${escapeHtml(robot.disclaimer || "")}</p>
+    ${
+      idx >= 0
+        ? `<button type="button" class="add-btn robot-add" data-idx="${idx}">Önerileni sepete ekle</button>`
+        : ""
+    }
+  `;
+}
+
 function renderOffers(payload) {
   state.offers = payload.offers || [];
   state.activeVolume = "all";
@@ -330,6 +439,12 @@ function renderOffers(payload) {
       );
     }
   }
+  const pending = (state.markets || []).filter((m) => !m.live && m.source === "pending");
+  for (const m of pending) {
+    pills.push(
+      `<span class="pill warn">${escapeHtml(m.label)}: açık API yok</span>`
+    );
+  }
   els.statusRow.innerHTML = pills.join("");
 
   const volumes = [
@@ -340,6 +455,7 @@ function renderOffers(payload) {
     ),
   ].sort((a, b) => a.localeCompare(b, "tr"));
   renderVolumeChips(volumes);
+  renderRobot(payload.robot);
 
   if (!state.offers.length) {
     els.offerList.innerHTML =
@@ -348,6 +464,13 @@ function renderOffers(payload) {
   }
   paintOffers();
 }
+
+els.quickQueries?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".quick-chip");
+  if (!btn) return;
+  els.query.value = btn.dataset.q || btn.textContent || "";
+  els.form.requestSubmit();
+});
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -377,10 +500,18 @@ els.form.addEventListener("submit", async (e) => {
   } finally {
     els.searchBtn.disabled = false;
     els.searchBtn.textContent = "Karşılaştır";
+    syncTimer();
   }
 });
 
 els.offerList.addEventListener("click", (e) => {
+  const btn = e.target.closest(".add-btn");
+  if (!btn) return;
+  const offer = state.offers[Number(btn.dataset.idx)];
+  if (offer) addToCart(offer);
+});
+
+els.robotCard?.addEventListener("click", (e) => {
   const btn = e.target.closest(".add-btn");
   if (!btn) return;
   const offer = state.offers[Number(btn.dataset.idx)];
