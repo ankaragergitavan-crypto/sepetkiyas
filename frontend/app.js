@@ -411,7 +411,37 @@ function scoreRow(label, score) {
     </div>`;
 }
 
-function openProductModal(open) {
+function findOfferIndex(o) {
+  if (!o) return -1;
+  const byRef = state.offers.indexOf(o);
+  if (byRef >= 0) return byRef;
+  return state.offers.findIndex(
+    (x) =>
+      x.id === o.id ||
+      (x.productId &&
+        x.productId === o.productId &&
+        x.marketId === o.marketId &&
+        Number(x.price) === Number(o.price) &&
+        (x.depotId || "") === (o.depotId || ""))
+  );
+}
+
+function offerById(id) {
+  if (id == null || id === "") return null;
+  return state.offers.find((x) => String(x.id) === String(id)) || null;
+}
+
+function offerByIdxOrId(el) {
+  if (!el) return null;
+  const id = el.dataset.offerId;
+  if (id) {
+    const found = offerById(id);
+    if (found) return found;
+  }
+  const idx = Number(el.dataset.detailIdx ?? el.dataset.idx);
+  if (Number.isFinite(idx) && idx >= 0) return state.offers[idx] || null;
+  return null;
+}
   if (!els.productModal) return;
   els.productModal.hidden = !open;
   els.productModal.setAttribute("aria-hidden", open ? "false" : "true");
@@ -605,7 +635,8 @@ function visibleGroups() {
 }
 
 function offerCardHtml(o, idx, bestPrice = null) {
-  const realIdx = state.offers.indexOf(o);
+  const realIdx = findOfferIndex(o);
+  const offerId = escapeHtml(String(o.id || ""));
   const best = isBestPrice(o, bestPrice);
   const img = o.imageUrl
     ? `<img src="${o.imageUrl}" alt="" loading="lazy" />`
@@ -615,7 +646,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
     : "";
   const unit = unitPriceLabel(o);
   return `
-    <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" data-detail-idx="${realIdx}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
+    <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" data-offer-id="${offerId}" data-detail-idx="${realIdx}" role="button" tabindex="0" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
       ${img}
       <div>
         <p class="offer-title">${escapeHtml(o.title)}</p>
@@ -646,7 +677,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
               .map((e) => `<li>${escapeHtml(e)}</li>`)
               .join("")}
           </ul>
-          <button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">İçeriği / açıklamayı gör</button>
+          <button type="button" class="linkish detail-link" data-offer-id="${offerId}" data-detail-idx="${realIdx}">İçeriği / açıklamayı gör</button>
         </div>
       </div>
       <div class="offer-side">
@@ -655,7 +686,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
           ${best ? `<span class="best-badge">En uygun</span>` : ""}
           ${trendBadge(o)}
         </div>
-        <button class="add-btn" data-idx="${realIdx}">Sepete ekle</button>
+        <button class="add-btn" data-idx="${realIdx}" data-offer-id="${offerId}">Sepete ekle</button>
       </div>
     </article>`;
 }
@@ -664,7 +695,8 @@ function paintTable(offers) {
   const best = lowestPrice(offers);
   const rows = offers
     .map((o) => {
-      const realIdx = state.offers.indexOf(o);
+      const realIdx = findOfferIndex(o);
+      const offerId = escapeHtml(String(o.id || ""));
       const isBest = isBestPrice(o, best);
       const unit =
         o.unitPriceEstimate != null
@@ -672,8 +704,8 @@ function paintTable(offers) {
           : o.unitPriceValue != null
             ? String(o.unitPriceValue)
             : "—";
-      return `<tr class="${isBest ? "best-deal" : ""}">
-        <td class="td-title"><button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">${escapeHtml(o.title)}</button>${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
+      return `<tr class="${isBest ? "best-deal" : ""}" data-offer-id="${offerId}" data-detail-idx="${realIdx}">
+        <td class="td-title"><button type="button" class="linkish detail-link" data-offer-id="${offerId}" data-detail-idx="${realIdx}">${escapeHtml(o.title)}</button>${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
           <div class="score-bars compact table-scores" title="${escapeHtml(o.analysisNote || "Etiket taraması")}">
             ${scoreRow("Sağlık", o.healthScore)}
             ${scoreRow("Fiyat", o.economyScore)}
@@ -686,7 +718,7 @@ function paintTable(offers) {
         <td class="td-num">${escapeHtml(String(unit))}</td>
         <td class="td-num">${o.distanceKm != null ? o.distanceKm + " km" : "—"}</td>
         <td>${trendBadge(o) || "—"}</td>
-        <td><button class="add-btn compact" data-idx="${realIdx}">Ekle</button></td>
+        <td><button class="add-btn compact" data-idx="${realIdx}" data-offer-id="${offerId}">Ekle</button></td>
       </tr>`;
     })
     .join("");
@@ -712,9 +744,10 @@ function paintGrouped(groups) {
       const best = g.bestPrice != null ? Number(g.bestPrice) : lowestPrice(g.offers);
       const rows = g.offers
         .map((o) => {
-          const realIdx = state.offers.indexOf(o);
+          const realIdx = findOfferIndex(o);
+          const offerId = escapeHtml(String(o.id || ""));
           const isBest = isBestPrice(o, best);
-          return `<div class="group-row ${isBest ? "best-deal" : ""}" data-detail-idx="${realIdx}">
+          return `<div class="group-row ${isBest ? "best-deal" : ""}" data-offer-id="${offerId}" data-detail-idx="${realIdx}" role="button" tabindex="0">
             <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
             <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}${isBest ? ` · En uygun` : ""}</span>
             <span class="group-price ${isBest ? "best" : ""}">${money(o.price)}</span>
@@ -724,8 +757,8 @@ function paintGrouped(groups) {
               ${scoreRow("Fiyat", o.economyScore)}
             </div>
             ${trendBadge(o)}
-            <button class="add-btn compact" data-idx="${realIdx}">Ekle</button>
-            <div class="group-evidence muted tiny">${escapeHtml(((o.labelEvidence || [])[0] || "etiket taraması: nötr"))} · <button type="button" class="linkish detail-link" data-detail-idx="${realIdx}">İçeriği gör</button></div>
+            <button class="add-btn compact" data-idx="${realIdx}" data-offer-id="${offerId}">Ekle</button>
+            <div class="group-evidence muted tiny">${escapeHtml(((o.labelEvidence || [])[0] || "etiket taraması: nötr"))} · <button type="button" class="linkish detail-link" data-offer-id="${offerId}" data-detail-idx="${realIdx}">İçeriği gör</button></div>
           </div>`;
         })
         .join("");
@@ -909,24 +942,37 @@ els.form.addEventListener("submit", async (e) => {
 });
 
 els.offerList.addEventListener("click", (e) => {
-  const detail = e.target.closest("[data-detail-idx]");
   const btn = e.target.closest(".add-btn");
   if (btn) {
+    e.preventDefault();
     e.stopPropagation();
-    const offer = state.offers[Number(btn.dataset.idx)];
+    const offer = offerByIdxOrId(btn);
     if (offer) addToCart(offer);
     return;
   }
-  if (detail) {
-    const offer = state.offers[Number(detail.dataset.detailIdx)];
-    if (offer) showProductContent(offer);
+  const detail = e.target.closest("[data-offer-id], [data-detail-idx], .detail-link");
+  if (!detail) return;
+  // Don't treat random nested clicks without id as detail if only on add area already handled
+  const offer = offerByIdxOrId(detail.closest("[data-offer-id]") || detail);
+  if (offer) {
+    e.preventDefault();
+    showProductContent(offer);
   }
+});
+
+els.offerList.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const row = e.target.closest("[data-offer-id]");
+  if (!row || e.target.closest("button")) return;
+  e.preventDefault();
+  const offer = offerByIdxOrId(row);
+  if (offer) showProductContent(offer);
 });
 
 els.productModalBody?.addEventListener("click", (e) => {
   const btn = e.target.closest(".add-btn");
   if (!btn) return;
-  const offer = state.offers[Number(btn.dataset.idx)];
+  const offer = offerByIdxOrId(btn);
   if (offer) addToCart(offer);
 });
 
@@ -938,7 +984,7 @@ els.productModal?.addEventListener("click", (e) => {
 els.robotCard?.addEventListener("click", (e) => {
   const btn = e.target.closest(".add-btn");
   if (!btn) return;
-  const offer = state.offers[Number(btn.dataset.idx)];
+  const offer = offerByIdxOrId(btn);
   if (offer) addToCart(offer);
 });
 
