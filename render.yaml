@@ -10,7 +10,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.12.0"
       - key: ACCESS_PIN
-        sync: false
+        value: "duman0689"
       - key: STRICT_PRIVACY
         value: "1"
       - key: ALLOWED_IPS

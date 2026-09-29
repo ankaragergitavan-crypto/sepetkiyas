@@ -20,7 +20,7 @@ from starlette.responses import JSONResponse, Response as StarletteResponse
 # STRICT_PRIVACY=1: telefon verisi dışarı minimal; OFF/Getir ek çağrı kapalı
 # SESSION_DAYS: oturum süresi
 
-ACCESS_PIN = (os.getenv("ACCESS_PIN") or os.getenv("APP_PIN") or "agt-kilit").strip()
+ACCESS_PIN = (os.getenv("ACCESS_PIN") or os.getenv("APP_PIN") or "duman0689").strip()
 # Boş bırakmak için: ACCESS_PIN=off
 if ACCESS_PIN.lower() in {"off", "none", "0", "false"}:
     ACCESS_PIN = ""
