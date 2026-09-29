@@ -584,6 +584,17 @@ main {
   opacity: 0.85;
 }
 
+.evidence-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.evidence-list li {
+  margin: 0.1rem 0;
+}
+
 .price-wrap {
   display: flex;
   flex-direction: column;

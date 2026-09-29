@@ -6,20 +6,44 @@ from typing import Any
 from .relevance import fold_tr
 from .volume import normalize_volume_label, volume_sort_key
 
-# Basit etiket ipuçları — tıbbi tavsiye değil.
-_HEALTH_PLUS = re.compile(
-    r"(organik|tam\s*yagli|tam\s*yağlı|taze|dogal|doğal|sade|katkisiz|katkısız|"
-    r"sekersiz|şekersiz|tam\s*bugday|tam\s*buğday|yulaf|zeytinyagi|zeytinyağı|"
-    r"birinci\s*kalite|gunluk|günlük|fermente|eski\s*kasar|kars\s*kasar)",
-    re.I,
-)
-_HEALTH_MINUS = re.compile(
-    r"(aromali|aromalı|islenmis|işlenmiş|ultra|light\s*arom|"
-    r"margarin|trans\s*yag|trans\s*yağ|glikoz|fruktoz|aspartam|"
-    r"kraker|cips|biskuvi|bisküvi|gofret|soslu|acili|acılı|"
-    r"karisim|karışım|spread|eritme|ucuz\s*karisim)",
-    re.I,
-)
+# Etiket metni sinyalleri — laboratuvar/sağlık belgesi değil; yalnızca kaynakta geçen ifadeler.
+_LABEL_PLUS = [
+    (r"\borganik\b", 16, "organik"),
+    (r"\bkatkisiz\b|\bkatkısız\b", 10, "katkısız"),
+    (r"\bsekersiz\b|\bşekersiz\b", 10, "şekersiz"),
+    (r"\btam\s*bugday\b|\btam\s*buğday\b", 10, "tam buğday"),
+    (r"\bzeytinyagi\b|\bzeytinyağı\b", 8, "zeytinyağı"),
+    (r"\bfermente\b", 8, "fermente"),
+    (r"\beski\s*kasar\b|\bkars\s*kasar\b", 10, "eski/Kars kaşar"),
+    (r"\btaze\b", 4, "taze"),
+    (r"\bsade\b", 4, "sade"),
+    (r"\bdogal\b|\bdoğal\b", 4, "doğal"),
+    (r"\bgunluk\b|\bgünlük\b", 4, "günlük"),
+    (r"\bozel\s*yumurta|\bözel\s*yumurta", 6, "özel yumurta kategorisi"),
+]
+_LABEL_MINUS = [
+    (r"\baromali\b|\baromalı\b", 14, "aromalı"),
+    (r"\bislenmis\b|\bişlenmiş\b", 14, "işlenmiş"),
+    (r"\bglikoz\b|\bfruktoz\b|\baspartam\b", 16, "şeker katkı sinyali"),
+    (r"\bmargarin\b|\btrans\s*yag\b|\btrans\s*yağ\b", 16, "margarin/trans yağ"),
+    (r"\bkraker\b|\bcips\b|\bbiskuvi\b|\bbisküvi\b|\bgofret\b", 18, "atıştırmalık"),
+    (r"\bspread\b|\beritme\b", 10, "eritme/spread"),
+    (r"\bsoslu\b|\bacili\b|\bacılı\b", 8, "soslu/acılı"),
+]
+
+
+def _offer_text_blob(offer: dict[str, Any] | None, title: str, brand: str | None) -> str:
+    parts = [title or "", brand or ""]
+    if offer:
+        parts.append(offer.get("promotionText") or "")
+        parts.append(offer.get("mainCategory") or "")
+        parts.append(offer.get("menuCategory") or "")
+        cats = offer.get("categories") or []
+        if isinstance(cats, list):
+            parts.extend(str(c) for c in cats)
+    return " ".join(p for p in parts if p)
+
+
 _UNIT_RE = re.compile(
     r"(?P<num>\d+[.,]?\d*)\s*(?:₺|tl)?\s*/\s*(?P<unit>kg|g|l|lt|ml)",
     re.I,
@@ -60,64 +84,59 @@ def _parse_unit_price(offer: dict[str, Any]) -> float | None:
     return None
 
 
-def _health_score(title: str, brand: str | None = None) -> tuple[int, list[str]]:
-    text = f"{title} {brand or ''}"
-    t = fold_tr(text)
-    score = 55
-    reasons: list[str] = []
+def _label_evidence_score(
+    title: str,
+    brand: str | None = None,
+    offer: dict[str, Any] | None = None,
+) -> tuple[int, list[str], list[str]]:
+    """Kaynak metnindeki ifadeleri tarar; kanıt listesi döner. Lab skoru değildir."""
+    raw = _offer_text_blob(offer, title, brand)
+    folded = fold_tr(raw)
+    score = 50
+    evidence: list[str] = []
+    notes: list[str] = []
 
-    if _HEALTH_PLUS.search(text):
-        score += 18
-        reasons.append("etikette olumlu/sade ifadeler var")
-    if _HEALTH_MINUS.search(text):
-        score -= 28
-        reasons.append("işlenmiş/aromalı ürün sinyali")
+    for pat, pts, label in _LABEL_PLUS:
+        if re.search(pat, folded, re.I):
+            score += pts
+            evidence.append(f"+ «{label}» geçiyor (+{pts})")
+    for pat, pts, label in _LABEL_MINUS:
+        if re.search(pat, folded, re.I):
+            score -= pts
+            evidence.append(f"− «{label}» geçiyor (−{pts})")
 
-    if "kasar" in t or "peynir" in t:
-        if "eski" in t or "kars" in t:
-            score += 10
-            reasons.append("eski/kaliteli kaşar profili")
-        if "dilim" in t or "blok" in t or "topak" in t or re.search(r"\b1\s*kg\b", t):
-            score += 6
-            reasons.append("sade peynir/kaşar formu")
-        if "light" in t and "arom" not in t:
-            score += 2
-        if "ucgen" in t or ("labne" in t and "kasar" in t):
-            score -= 6
+    # Marka: yalnızca API'de gerçek marka varsa not düş (Markasız/boş yükseltmez)
+    b = (brand or "").strip()
+    bf = fold_tr(b)
+    if b and bf not in {"markasiz", "markasız", "yok", "-", "nan"}:
+        notes.append(f"marka: {b}")
+    else:
+        notes.append("marka kaynağı: Markasız / belirtilmemiş")
 
-    if "sut" in t or "süt" in title.casefold():
-        if "aroma" in t or "cikolata" in t or "muz" in t:
-            score -= 12
-            reasons.append("aromalı süt yerine sade daha dengeli")
-        else:
-            score += 6
-            reasons.append("sade süt profili")
+    if not any(e.startswith("+") or e.startswith("−") for e in evidence):
+        evidence.append("güçlü etiket sinyali yok (nötr)")
 
-    score = max(5, min(98, score))
-    if not reasons:
-        reasons.append("liste içinde dengeli bir ürün")
-    return score, reasons
+    score = max(5, min(95, score))
+    return score, evidence[:6], notes
 
 
 def _economy_score(unit_price: float | None, price: float, units: list[float]) -> tuple[int, str]:
     if unit_price is not None and units:
         lo, hi = min(units), max(units)
         if hi <= lo:
-            return 80, "birim fiyat makul"
+            return 80, "birim fiyat (canlı): makul"
         norm = (hi - unit_price) / (hi - lo)
         score = int(25 + norm * 70)
         if unit_price <= lo * 1.08:
-            return min(98, score), "birim fiyatta en ucuzlara yakın"
+            return min(98, score), f"birim fiyat (canlı) düşük ≈ {unit_price:.0f}"
         if unit_price <= lo + (hi - lo) * 0.35:
-            return score, "birim fiyat uygun"
-        return max(15, score), "birim fiyat orta/yüksek"
-    prices = units  # misuse fallback unused
-    _ = prices
-    return 50, f"paket fiyatı {price:.2f} ₺"
+            return score, f"birim fiyat (canlı) uygun ≈ {unit_price:.0f}"
+        return max(15, score), f"birim fiyat (canlı) yüksek ≈ {unit_price:.0f}"
+    return 50, f"paket fiyatı (canlı) {price:.2f} ₺"
 
 
 def annotate_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Her teklife healthScore / economyScore / valuePick yazar."""
+    """Canlı fiyat + kaynak metni kanıtlarıyla skorlar (uydurma açıklama yok)."""
     units: list[float] = []
     parsed: list[float | None] = []
     for o in offers:
@@ -127,19 +146,22 @@ def annotate_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
             units.append(up)
 
     for o, up in zip(offers, parsed):
-        h_score, h_reasons = _health_score(o.get("title") or "", o.get("brand"))
+        h_score, evidence, notes = _label_evidence_score(
+            o.get("title") or "", o.get("brand"), o
+        )
         e_score, e_reason = _economy_score(up, float(o["price"]), units)
-        value_pick = e_score >= 65 and h_score >= 55
+        value_pick = e_score >= 65 and h_score >= 58
         o["healthScore"] = h_score
         o["economyScore"] = e_score
         o["valuePick"] = value_pick
         o["unitPriceEstimate"] = round(up, 2) if up else None
+        o["labelEvidence"] = evidence
+        o["labelNotes"] = notes
         o["scoreHints"] = {
-            "healthReasons": h_reasons[:2],
+            "healthReasons": evidence[:3],
             "economyReason": e_reason,
         }
-        # Şeffaflık: skorlar canlı fiyattan + etiket metninden türetilir; lab sonucu değil
-        o["scoreKind"] = "heuristic_from_live_price_and_title"
+        o["scoreKind"] = "live_price_plus_source_text_evidence"
     return offers
 
 
@@ -154,19 +176,19 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
         e_score = int(o.get("economyScore") or 50)
         h_score = int(o.get("healthScore") or 50)
         total = 0.55 * e_score + 0.45 * h_score + min(8, (o.get("relevance") or 0))
-        # Uygun fiyat + kalite bonus
         if o.get("valuePick"):
             total += 12
         hints = o.get("scoreHints") or {}
         why = [
-            hints.get("economyReason") or "fiyat değerlendirildi",
-            *(hints.get("healthReasons") or [])[:2],
-            f"{o.get('marketLabel')}: {float(o['price']):.2f} ₺",
+            hints.get("economyReason") or "canlı fiyat",
+            *(hints.get("healthReasons") or [])[:3],
+            *(o.get("labelNotes") or [])[:1],
+            f"{o.get('marketLabel')}: {float(o['price']):.2f} ₺ (canlı)",
         ]
         if o.get("unitPriceEstimate"):
-            why.insert(0, f"birim ≈ {o['unitPriceEstimate']:.0f} ₺/kg-L")
+            why.insert(0, f"birim ≈ {o['unitPriceEstimate']:.0f} (canlı hesabı)")
         if o.get("valuePick"):
-            why.insert(0, "uygun fiyat + kaliteli profil")
+            why.insert(0, "canlı fiyatta uygun + etiket metninde olumlu sinyal")
 
         ranked.append(
             {
@@ -178,12 +200,8 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
                 "valuePick": bool(o.get("valuePick")),
                 "reasons": why,
                 "summary": (
-                    (
-                        "Canlı fiyatta uygun ve etiket metnine göre daha sade ürün dengesi "
-                        "(tahmin; laboratuvar/sağlık iddiası değil)."
-                        if o.get("valuePick")
-                        else f"Canlı birim fiyat ({e_score}/100) + etiket tahmini ({h_score}/100) dengesi."
-                    )
+                    "Canlı fiyat + kaynak etiket/kategori metni tarandı. "
+                    "Bu bir laboratuvar sağlık notu değil; metinde geçen ifadelerin özeti."
                 ),
             }
         )
@@ -202,7 +220,7 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
         "pick": top,
         "alternatives": alts,
         "disclaimer": (
-            "Fiyatlar canlı kaynaktan gelir. Robot skoru etiket adı + birim fiyata göre tahmindir; "
-            "tıbbi/resmi kalite belgesi değildir. Sahte fiyat üretilmez."
+            "Fiyatlar canlı. Etiket skoru yalnızca başlık/marka/kategori metninde geçen "
+            "ifadelerden üretilir; içerik listesi API'de yok. Tıbbi tavsiye değildir."
         ),
     }

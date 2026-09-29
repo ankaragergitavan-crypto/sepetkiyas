@@ -56,7 +56,11 @@ def _flatten_offers(product: dict[str, Any], target_ids: set[str]) -> list[dict[
                 "title": product.get("title") or "Ürün",
                 "brand": product.get("brand"),
                 "imageUrl": product.get("imageUrl"),
-                "volume": product.get("refinedVolumeOrWeight"),
+                "volume": product.get("refinedVolumeOrWeight")
+                or product.get("refinedQuantityUnit"),
+                "categories": product.get("categories") or [],
+                "mainCategory": product.get("main_category"),
+                "menuCategory": product.get("menu_category"),
                 "marketId": market_id,
                 "marketLabel": meta.label,
                 "marketColor": meta.color,

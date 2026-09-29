@@ -407,10 +407,18 @@ function paintOffers() {
               ${o.updatedAt ? `<span>güncelleme ${escapeHtml(o.updatedAt)}</span>` : ""}
               ${o.discount ? `<span class="pill-discount">kaynak: indirimli</span>` : ""}
             </div>
-            <div class="score-bars" title="Etiket/fiyat tahmini — resmi sağlık skoru değil">
+            <div class="score-bars" title="Kaynak metninden kanıt — laboratuvar skoru değil">
               ${scoreRow("Etiket", o.healthScore)}
               ${scoreRow("Fiyat", o.economyScore)}
             </div>
+            ${
+              (o.labelEvidence || []).length
+                ? `<ul class="evidence-list">${(o.labelEvidence || [])
+                    .slice(0, 3)
+                    .map((e) => `<li>${escapeHtml(e)}</li>`)
+                    .join("")}</ul>`
+                : ""
+            }
           </div>
           <div class="offer-side">
             <div class="price-wrap">
