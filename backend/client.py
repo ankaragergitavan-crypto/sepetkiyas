@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Any
 
 import httpx
 
 from .markets import (
+    ANKARA_BOUNDS,
     API_NAME_TO_ID,
     DEFAULT_DISTANCE_KM,
     DEFAULT_LAT,
@@ -35,7 +37,29 @@ def _normalize_market(api_name: str | None) -> str | None:
     return API_NAME_TO_ID.get(key)
 
 
-def _flatten_offers(product: dict[str, Any], target_ids: set[str]) -> list[dict[str, Any]]:
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _in_ankara(lat: float, lon: float) -> bool:
+    b = ANKARA_BOUNDS
+    return b["lat_min"] <= lat <= b["lat_max"] and b["lon_min"] <= lon <= b["lon_max"]
+
+
+def _flatten_offers(
+    product: dict[str, Any],
+    target_ids: set[str],
+    *,
+    origin_lat: float,
+    origin_lon: float,
+    max_km: float,
+) -> list[dict[str, Any]]:
+    """Yalnızca geçerli fiyat + seçilen konumdaki şube (uzak şehir yok)."""
     offers: list[dict[str, Any]] = []
     for depot in product.get("productDepotInfoList") or []:
         market_id = _normalize_market(depot.get("marketAdi"))
@@ -48,6 +72,20 @@ def _flatten_offers(product: dict[str, Any], target_ids: set[str]) -> list[dict[
             price_f = float(price)
         except (TypeError, ValueError):
             continue
+        if price_f <= 0:
+            continue
+
+        try:
+            dlat = float(depot.get("latitude"))
+            dlon = float(depot.get("longitude"))
+        except (TypeError, ValueError):
+            continue
+        if not _in_ankara(dlat, dlon):
+            continue
+        dist = _haversine_km(origin_lat, origin_lon, dlat, dlon)
+        if dist > max_km + 0.35:
+            continue
+
         meta = MARKET_BY_ID[market_id]
         offers.append(
             {
@@ -69,12 +107,16 @@ def _flatten_offers(product: dict[str, Any], target_ids: set[str]) -> list[dict[
                 "unitPriceValue": depot.get("unitPriceValue"),
                 "depotName": depot.get("depotName"),
                 "depotId": depot.get("depotId"),
+                "depotLat": dlat,
+                "depotLon": dlon,
+                "distanceKm": round(dist, 2),
                 "discount": bool(depot.get("discount")),
                 "discountRatio": depot.get("discountRatio"),
                 "percentage": depot.get("percentage"),
                 "promotionText": depot.get("promotionText"),
                 "updatedAt": depot.get("indexTime"),
                 "source": "marketfiyati",
+                "inStockLive": True,
             }
         )
     return offers
@@ -109,7 +151,6 @@ async def search_marketfiyati(
     market_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     target = set(market_ids or [m.id for m in MARKETS if m.source == "marketfiyati"])
-    # Always include only marketfiyati-backed markets for this source
     target &= {m.id for m in MARKETS if m.source == "marketfiyati"}
 
     async with httpx.AsyncClient(
@@ -135,7 +176,15 @@ async def search_marketfiyati(
 
     offers: list[dict[str, Any]] = []
     for product in data.get("content") or []:
-        offers.extend(_flatten_offers(product, target))
+        offers.extend(
+            _flatten_offers(
+                product,
+                target,
+                origin_lat=latitude,
+                origin_lon=longitude,
+                max_km=float(distance),
+            )
+        )
 
     offers.sort(key=lambda o: (o["price"], o["marketLabel"], o["title"]))
 
@@ -155,10 +204,7 @@ async def search_marketfiyati(
 
 
 async def try_getir_buyuk(keywords: str) -> dict[str, Any]:
-    """Best-effort Getir Büyük probe. Returns empty offers if unavailable."""
     meta = MARKET_BY_ID["getir_buyuk"]
-    # Getir's public web APIs are location/session locked and frequently blocked.
-    # Keep a stable empty response so the UI can show an honest status.
     await asyncio.sleep(0)
     return {
         "marketId": meta.id,
@@ -166,7 +212,7 @@ async def try_getir_buyuk(keywords: str) -> dict[str, Any]:
         "available": False,
         "reason": (
             "Getir Büyük resmi açık API sunmuyor; marketfiyati.org.tr "
-            "kaynağında da yer almıyor. Diğer 5 market canlı çekiliyor."
+            "kaynağında da yer almıyor."
         ),
         "offers": [],
     }

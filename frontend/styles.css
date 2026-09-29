@@ -403,6 +403,132 @@ main {
   font-size: 0.9rem;
 }
 
+.results-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.view-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.view-btn.active {
+  background: var(--accent);
+  color: #062015;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 640px;
+}
+
+.price-table th,
+.price-table td {
+  padding: 0.65rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.price-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.price-table .td-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tiny {
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.product-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  background: rgba(22, 36, 28, 0.65);
+}
+
+.group-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.group-head img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.group-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.group-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr auto auto auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+
+.add-btn.compact {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.cart-winner {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(125, 255, 179, 0.35);
+  background: rgba(125, 255, 179, 0.1);
+  color: var(--ink);
+}
+
+.cart-panel.winner {
+  border-color: rgba(125, 255, 179, 0.4);
+}
+
 .status-row {
   display: flex;
   flex-wrap: wrap;

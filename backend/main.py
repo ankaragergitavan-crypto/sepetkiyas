@@ -24,6 +24,7 @@ from .markets import (
     clamp_to_ankara,
 )
 from .relevance import is_relevant, relevance_score
+from .grouping import build_product_groups, sort_offers_by_unit_price
 from .robot import annotate_offers, build_robot_pick
 from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
@@ -213,6 +214,12 @@ async def search(body: SearchBody) -> dict[str, Any]:
                 "offerCount": getir.get("offerCount", 0),
             }
             result["offers"].extend(getir.get("offers") or [])
+            # Getir sonuçlarına da alaka uygula
+            result["offers"] = [
+                o
+                for o in result["offers"]
+                if is_relevant(o.get("title") or "", query, min_score=4)
+            ]
         except Exception as exc:  # noqa: BLE001
             getir_status = {
                 "available": False,
@@ -221,15 +228,6 @@ async def search(body: SearchBody) -> dict[str, Any]:
                 "offerCount": 0,
             }
 
-    # Önce alaka, sonra fiyat
-    result["offers"].sort(
-        key=lambda o: (
-            -(o.get("relevance") or relevance_score(o.get("title") or "", query)),
-            o["price"],
-            o.get("marketLabel") or "",
-            o["title"],
-        )
-    )
     by_market: dict[str, int] = {}
     for offer in result["offers"]:
         by_market[offer["marketId"]] = by_market.get(offer["marketId"], 0) + 1
@@ -243,8 +241,11 @@ async def search(body: SearchBody) -> dict[str, Any]:
 
     # Gerçek fiyat değişimi (önceki arama kaydı); yoksa ok yok
     apply_price_trends(result["offers"])
-    # TÜM tekliflerde etiket taraması (yumurta vb. tek kategori değil)
+    # Birim fiyat + etiket kanıtı
     annotate_offers(result["offers"])
+    # Birim fiyata göre sırala (paket fiyatı yanıltmasın)
+    result["offers"] = sort_offers_by_unit_price(result["offers"])
+    groups = build_product_groups(result["offers"])
 
     robot = build_robot_pick(result["offers"], query)
 
@@ -259,12 +260,14 @@ async def search(body: SearchBody) -> dict[str, Any]:
         "activeVolume": body.volume,
         "getir": getir_status,
         "robot": robot,
-        "sorted": "price_asc",
+        "groups": groups,
+        "sorted": "unit_price_asc",
         "dataPolicy": {
             "livePricesOnly": True,
             "noFabricatedOffers": True,
             "trendsRequirePriorObservation": True,
-            "note": "Yalnızca canlı kaynak fiyatı; uydurma teklif/trend yok.",
+            "sort": "unit_price_then_relevance",
+            "note": "Yalnızca canlı kaynak fiyatı; uydurma teklif/trend yok. Sıra birim fiyata göre.",
         },
     }
 

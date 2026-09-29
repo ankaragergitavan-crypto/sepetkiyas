@@ -100,7 +100,14 @@
             <h2 id="resultsTitle">Sonuçlar</h2>
             <p class="muted" id="resultsMeta"></p>
           </div>
-          <div class="sort-note">Sıralama: <strong>en ucuz → en pahalı</strong></div>
+          <div class="results-controls">
+            <div class="sort-note">Sıra: <strong>birim fiyat</strong> (ucuz → pahalı)</div>
+            <div class="view-toggle" id="viewToggle">
+              <button type="button" class="view-btn active" data-view="grouped">Gruplu</button>
+              <button type="button" class="view-btn" data-view="flat">Liste</button>
+              <button type="button" class="view-btn" data-view="table">Tablo</button>
+            </div>
+          </div>
         </div>
         <div class="volume-row" id="volumeRow" hidden></div>
         <div class="status-row" id="statusRow"></div>
@@ -129,8 +136,10 @@
         <button type="button" class="icon-btn" id="closeCart" aria-label="Kapat">×</button>
       </div>
       <p class="muted drawer-hint">
-        Ürün hangi markette seçildiyse o marketin sepetine eklenir. Sepetler ayrı tutulur.
+        Ürün hangi markette seçildiyse o marketin sepetine eklenir. En ucuz market sepeti
+        otomatik vurgulanır.
       </p>
+      <div id="cartWinner" class="cart-winner" hidden></div>
       <div id="cartPanels"></div>
       <div class="drawer-foot">
         <div class="grand">
