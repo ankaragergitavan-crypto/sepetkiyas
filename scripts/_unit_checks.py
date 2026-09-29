@@ -12,10 +12,12 @@ def test_relevance():
 
 
 def test_unit():
-    assert abs(_parse_unit_price({"title": "Ekmek 1 Adet", "price": 17.5, "volume": "1 Adet"}) - 17.5) < 0.01
-    assert abs(_parse_unit_price({"title": "Yumurta", "price": 95.0, "volume": "10 Adet"}) - 9.5) < 0.01
-    assert abs(_parse_unit_price({"title": "Süt", "price": 32.0, "volume": "1 L"}) - 32.0) < 0.01
-    assert abs(_parse_unit_price({"title": "Yağ", "price": 449.0, "volume": "5 L"}) - 89.8) < 0.01
+    assert abs(_parse_unit_price({"title": "Ekmek 1 Adet", "price": 17.5, "volume": "1 Adet"})[0] - 17.5) < 0.01
+    assert _parse_unit_price({"title": "Ekmek 1 Adet", "price": 17.5, "volume": "1 Adet"})[1] == "adet"
+    assert abs(_parse_unit_price({"title": "Yumurta", "price": 95.0, "volume": "10 Adet"})[0] - 9.5) < 0.01
+    assert abs(_parse_unit_price({"title": "Süt", "price": 32.0, "volume": "1 L"})[0] - 32.0) < 0.01
+    assert _parse_unit_price({"title": "Süt", "price": 32.0, "volume": "1 L"})[1] == "L"
+    assert abs(_parse_unit_price({"title": "Yağ", "price": 449.0, "volume": "5 L"})[0] - 89.8) < 0.01
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 /* SepetKıyas service worker — network-first shell so UI updates appear */
-const CACHE = "sepetkiyas-shell-v3";
+const CACHE = "sepetkiyas-shell-v5";
 const SHELL = ["/", "/static/styles.css", "/static/app.js", "/static/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

@@ -13,8 +13,8 @@ _LABEL_PLUS = [
     (r"\bsekersiz\b|\bşekersiz\b", 10, "şekersiz"),
     (r"\btuzsuz\b", 6, "tuzsuz"),
     (r"\btam\s*bugday\b|\btam\s*buğday\b", 10, "tam buğday"),
-    (r"\bcavdar\b|\bçavdar\b|\byulaf\b", 8, "çavdar/yulaf"),
-    (r"\bzeytinyagi\b|\bzeytinyağı\b|\bnatürel\b|\bsızma\b", 10, "zeytinyağı/sızma"),
+    (r"\bcavdar\b|\bçavdar\b|\byulaf\b|\bkinoa\b", 8, "çavdar/yulaf/kinoa"),
+    (r"\bzeytinyagi\b|\bzeytinyağı\b|\bnatürel\b|\bsızma\b|\bextra\s*virgin\b", 10, "zeytinyağı/sızma"),
     (r"\bfermente\b|\bprobiyotik\b", 8, "fermente/probiyotik"),
     (r"\beski\s*kasar\b|\bkars\s*kasar\b", 10, "eski/Kars kaşar"),
     (r"\btaze\b", 4, "taze"),
@@ -23,24 +23,33 @@ _LABEL_PLUS = [
     (r"\bgunluk\b|\bgünlük\b", 4, "günlük"),
     (r"\bpasteurize\b|\bpastorize\b|\bpastörize\b", 3, "pastörize"),
     (r"\btam\s*yagli\b|\btam\s*yağlı\b", 3, "tam yağlı"),
-    (r"\byagisz\b|\byağsız\b|\byarim\s*yagli\b|\byarım\s*yağlı\b", 3, "yağ oranı belirtilmiş"),
+    (r"\byagisz\b|\byağsız\b|\byarim\s*yagli\b|\byarım\s*yağlı\b|%\s*0[.,]?5|\b%1\b|\b%1[.,]5\b", 3, "yağ oranı belirtilmiş"),
     (r"\bkeçi\b|\bkecı\b|\bkeci\b", 4, "keçi"),
-    (r"\bdana\b|\bkuzu\b|\bpili[cç]\b|\btavuk\b", 2, "et türü belirtilmiş"),
+    (r"\bdana\b|\bkuzu\b|\bpili[cç]\b|\btavuk\b|\bbalik\b|\bbalık\b|\bsomon\b", 2, "et/balık türü belirtilmiş"),
     (r"\brife\b|\brifle\b|\b%100\b|\b100\s*%", 4, "saf/oran vurgusu"),
-    (r"\bozel\s*yumurta|\bözel\s*yumurta|\bkgb\b|\bgezen\b|\bkafessiz\b", 6, "özel yumurta/gezen"),
+    (r"\bozel\s*yumurta|\bözel\s*yumurta|\bkgb\b|\bgezen\b|\bkafessiz\b|\bkoy\b|\bköy\b", 6, "özel yumurta/gezen/köy"),
     (r"\bglütensiz\b|\bglutensiz\b|\bgluten\s*free\b", 6, "glutensiz"),
     (r"\bseker\s*ilavesiz\b|\bşeker\s*ilavesiz\b", 8, "şeker ilavesiz"),
+    (r"\blaktozsuz\b|\blactose\s*free\b", 6, "laktozsuz"),
+    (r"\bomega\s*-?\s*3\b|\bprotein\b|\blif\b|\bvita?min\b", 5, "besin vurgusu (protein/lif/vitamin/omega)"),
+    (r"\beski\s*hasat\b|\bsoğuk\s*pres\b|\bsoguk\s*pres\b", 8, "soğuk pres/eski hasat"),
+    (r"\bsebzeli\b|\bmeyve\b|\btaze\s*sikma\b|\btaze\s*sıkma\b", 3, "meyve/sebze vurgusu"),
+    (r"\bio\b|\beu\s*organik\b", 8, "organik sertifika sinyali"),
 ]
 _LABEL_MINUS = [
     (r"\baromali\b|\baromalı\b|\baroma\b", 12, "aroma/aromalı"),
     (r"\bislenmis\b|\bişlenmiş\b", 14, "işlenmiş"),
     (r"\bglikoz\b|\bfruktoz\b|\baspartam\b|\bglukoz\b", 16, "şeker katkı sinyali"),
-    (r"\bmargarin\b|\btrans\s*yag\b|\btrans\s*yağ\b", 16, "margarin/trans yağ"),
-    (r"\bkraker\b|\bcips\b|\bbiskuvi\b|\bbisküvi\b|\bgofret\b|\bcikolata\b|\bçikolata\b", 14, "atıştırmalık/tatlı"),
+    (r"\bmargarin\b|\btrans\s*yag\b|\btrans\s*yağ\b|\bhidrojen\b", 16, "margarin/trans/hidrojenize"),
+    (r"\bkraker\b|\bcips\b|\bbiskuvi\b|\bbisküvi\b|\bgofret\b|\bcikolata\b|\bcikolatali\b|\bçikolata\b|\bçikolatalı\b", 14, "atıştırmalık/tatlı"),
     (r"\bspread\b|\beritme\b|\bkrem\s*peynir\s*arom", 10, "eritme/spread"),
     (r"\bsoslu\b|\bacili\b|\bacılı\b|\bbaharatli\b|\bbaharatl[ıi]\b", 6, "soslu/baharatlı"),
     (r"\bhazir\b|\bhazır\b|\benstantane\b", 6, "hazır ürün"),
     (r"\bkoncentre\b|\bkonsantre\b|\bnektar\b", 5, "konsantre/nektar"),
+    (r"\bpalm\b|\bpalmiye\b", 10, "palm yağı sinyali"),
+    (r"\bmsg\b|\bmonosodyum\b|\bnitrit\b|\bnitrat\b", 12, "katkı (MSG/nitrit) sinyali"),
+    (r"\bsekerli\b|\bşekerli\b", 8, "şekerli"),
+    (r"\bkızartma\b|\bkizartma\b|\bfritoz\b|\bfried\b", 8, "kızartma"),
 ]
 
 
@@ -62,34 +71,39 @@ _UNIT_RE = re.compile(
 )
 
 
-def _parse_unit_price(offer: dict[str, Any]) -> float | None:
-    """kg/L için ₺/kg(L); adet için ₺/adet. Adeti gram sanma."""
+def _parse_unit_price(offer: dict[str, Any]) -> tuple[float | None, str | None]:
+    """(₺/birim, birim etiketi). kg/L → ₺/kg veya ₺/L; adet → ₺/adet."""
     price = offer.get("price")
     if price is None:
-        return None
+        return None, None
     try:
         price_f = float(price)
     except (TypeError, ValueError):
-        return None
+        return None, None
     if price_f <= 0:
-        return None
+        return None, None
 
     adet = parse_adet_count(offer.get("volume"), offer.get("title"))
     if adet:
-        return price_f / adet
+        return price_f / adet, "adet"
 
     vol = normalize_volume_label(offer.get("volume"))
     if vol:
+        upper = vol.upper()
         grams, _ = volume_sort_key(vol)
         if 0 < grams < 10**8:
             try:
-                return price_f / (grams / 1000.0)
+                per = price_f / (grams / 1000.0)
             except (TypeError, ValueError, ZeroDivisionError):
-                pass
+                per = None
+            if per is not None:
+                if "ML" in upper or re.search(r"\bL\b", upper):
+                    return per, "L"
+                return per, "kg"
 
     raw = offer.get("unitPrice")
     if isinstance(raw, (int, float)):
-        return float(raw)
+        return float(raw), "kg"
     if isinstance(raw, str):
         cleaned = raw.replace(" ", "").replace("₺", "").replace("TL", "")
         m = _UNIT_RE.search(cleaned) or _UNIT_RE.search(raw)
@@ -97,16 +111,18 @@ def _parse_unit_price(offer: dict[str, Any]) -> float | None:
             try:
                 num = float(m.group("num").replace(",", "."))
             except ValueError:
-                return None
+                return None, None
             unit = m.group("unit").lower()
             if unit == "g":
-                return num * 1000
+                return num * 1000, "kg"
             if unit == "ml":
-                return num * 1000
-            if unit in {"lt", "l", "kg"}:
-                return num
-            return num
-    return None
+                return num * 1000, "L"
+            if unit in {"lt", "l"}:
+                return num, "L"
+            if unit == "kg":
+                return num, "kg"
+            return num, "kg"
+    return None, None
 
 
 def _label_evidence_score(
@@ -139,66 +155,89 @@ def _label_evidence_score(
         notes.append("marka kaynağı: Markasız / belirtilmemiş")
 
     if not any(e.startswith("+") or e.startswith("−") for e in evidence):
-        evidence.append("güçlü etiket sinyali yok (nötr)")
+        evidence.append("güçlü etiket sinyali yok (nötr ≈ 50)")
 
     score = max(5, min(95, score))
-    return score, evidence[:6], notes
+    return score, evidence[:8], notes
 
 
-def _economy_score(unit_price: float | None, price: float, units: list[float]) -> tuple[int, str]:
+def _economy_score(unit_price: float | None, price: float, units: list[float], unit_label: str | None) -> tuple[int, str]:
+    ul = unit_label or "birim"
     if unit_price is not None and units:
         lo, hi = min(units), max(units)
         if hi <= lo:
-            return 80, "birim fiyat (canlı): makul"
+            return 80, f"birim fiyat (canlı): makul ≈ {unit_price:.0f} ₺/{ul}"
         norm = (hi - unit_price) / (hi - lo)
         score = int(25 + norm * 70)
         if unit_price <= lo * 1.08:
-            return min(98, score), f"birim fiyat (canlı) düşük ≈ {unit_price:.0f}"
+            return min(98, score), f"birim fiyat düşük ≈ {unit_price:.0f} ₺/{ul}"
         if unit_price <= lo + (hi - lo) * 0.35:
-            return score, f"birim fiyat (canlı) uygun ≈ {unit_price:.0f}"
-        return max(15, score), f"birim fiyat (canlı) yüksek ≈ {unit_price:.0f}"
+            return score, f"birim fiyat uygun ≈ {unit_price:.0f} ₺/{ul}"
+        return max(15, score), f"birim fiyat yüksek ≈ {unit_price:.0f} ₺/{ul}"
     return 50, f"paket fiyatı (canlı) {price:.2f} ₺"
 
 
 def annotate_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Canlı fiyat + kaynak metni kanıtlarıyla skorlar (uydurma açıklama yok)."""
+    """Her teklifte zorunlu etiket taraması + sağlık/fiyat % (uydurma yok)."""
     units: list[float] = []
-    parsed: list[float | None] = []
+    parsed: list[tuple[float | None, str | None]] = []
     for o in offers:
-        up = _parse_unit_price(o)
-        parsed.append(up)
+        up, ul = _parse_unit_price(o)
+        parsed.append((up, ul))
         if up is not None and up > 0:
             units.append(up)
 
-    for o, up in zip(offers, parsed):
-        # Zaten tarandıysa tekrar bozma (main + robot çift çağrı)
-        if o.get("scoreKind") == "live_price_plus_source_text_evidence" and "labelEvidence" in o:
-            # ekonomi skorunu güncel birim listesine göre yenile
-            e_score, e_reason = _economy_score(up, float(o["price"]), units)
-            o["economyScore"] = e_score
-            o["unitPriceEstimate"] = round(up, 2) if up else o.get("unitPriceEstimate")
-            hints = o.get("scoreHints") or {}
-            hints["economyReason"] = e_reason
-            o["scoreHints"] = hints
-            o["valuePick"] = e_score >= 65 and int(o.get("healthScore") or 0) >= 58
-            continue
+    for o, (up, ul) in zip(offers, parsed):
+        # Her aramada etiket analizi yeniden yapılır (skor her zaman dolu)
         h_score, evidence, notes = _label_evidence_score(
             o.get("title") or "", o.get("brand"), o
         )
-        e_score, e_reason = _economy_score(up, float(o["price"]), units)
+        e_score, e_reason = _economy_score(up, float(o["price"]), units, ul)
         value_pick = e_score >= 65 and h_score >= 58
-        o["healthScore"] = h_score
-        o["economyScore"] = e_score
+        o["healthScore"] = int(h_score)
+        o["economyScore"] = int(e_score)
         o["valuePick"] = value_pick
         o["unitPriceEstimate"] = round(up, 2) if up else None
+        o["unitPriceUnit"] = ul
         o["labelEvidence"] = evidence
         o["labelNotes"] = notes
         o["scoreHints"] = {
-            "healthReasons": evidence[:3],
+            "healthReasons": evidence[:4],
             "economyReason": e_reason,
         }
         o["scoreKind"] = "live_price_plus_source_text_evidence"
+        o["analysisNote"] = (
+            "Sağlık %: başlık/marka/kategori etiket metni taraması. "
+            "Laboratuvar veya içerik listesi API'de yok."
+        )
     return offers
+
+
+def _pick_reasons(o: dict[str, Any], e_score: int, h_score: int, total: float) -> list[str]:
+    hints = o.get("scoreHints") or {}
+    reasons: list[str] = [
+        f"Sağlık skoru {h_score}/100 (etiket metni analizi)",
+    ]
+    for ev in (hints.get("healthReasons") or o.get("labelEvidence") or [])[:4]:
+        reasons.append(str(ev))
+    econ = hints.get("economyReason") or "canlı fiyat"
+    reasons.append(f"Fiyat skoru {e_score}/100 — {econ}")
+    if o.get("unitPriceEstimate") is not None:
+        ul = o.get("unitPriceUnit") or "birim"
+        reasons.append(f"Birim fiyat ≈ {float(o['unitPriceEstimate']):.0f} ₺/{ul}")
+    reasons.append(
+        f"Canlı paket: {o.get('marketLabel')} {float(o['price']):.2f} ₺"
+        + (f" · {o['depotName']}" if o.get("depotName") else "")
+    )
+    if o.get("distanceKm") is not None:
+        reasons.append(f"Uzaklık {o['distanceKm']} km (Ankara canlı şube)")
+    reasons.append(
+        f"Neden önerildi: birleşik skor {total:.0f} "
+        f"(fiyat ağırlığı %55 + sağlık ağırlığı %45"
+        + (", uygun fiyat+etiket bonusu" if o.get("valuePick") else "")
+        + ")"
+    )
+    return reasons
 
 
 def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any] | None:
@@ -214,17 +253,7 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
         total = 0.55 * e_score + 0.45 * h_score + min(8, (o.get("relevance") or 0))
         if o.get("valuePick"):
             total += 12
-        hints = o.get("scoreHints") or {}
-        why = [
-            hints.get("economyReason") or "canlı fiyat",
-            *(hints.get("healthReasons") or [])[:3],
-            *(o.get("labelNotes") or [])[:1],
-            f"{o.get('marketLabel')}: {float(o['price']):.2f} ₺ (canlı)",
-        ]
-        if o.get("unitPriceEstimate"):
-            why.insert(0, f"birim ≈ {o['unitPriceEstimate']:.0f} (canlı hesabı)")
-        if o.get("valuePick"):
-            why.insert(0, "canlı fiyatta uygun + etiket metninde olumlu sinyal")
+        why = _pick_reasons(o, e_score, h_score, total)
 
         ranked.append(
             {
@@ -233,11 +262,14 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
                 "economyScore": e_score,
                 "healthScore": h_score,
                 "unitPriceEstimate": o.get("unitPriceEstimate"),
+                "unitPriceUnit": o.get("unitPriceUnit"),
                 "valuePick": bool(o.get("valuePick")),
                 "reasons": why,
+                "whyTitle": "Neden önerildi",
                 "summary": (
-                    "Canlı fiyat + kaynak etiket/kategori metni tarandı. "
-                    "Bu bir laboratuvar sağlık notu değil; metinde geçen ifadelerin özeti."
+                    f"“{query}” için canlı fiyat + etiket metni tarandı. "
+                    f"Sağlık {h_score}/100, fiyat {e_score}/100. "
+                    "Laboratuvar skoru değildir; kaynak metnindeki ifadelerin özeti."
                 ),
             }
         )
@@ -256,7 +288,7 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
         "pick": top,
         "alternatives": alts,
         "disclaimer": (
-            "Fiyatlar canlı. Etiket skoru yalnızca başlık/marka/kategori metninde geçen "
-            "ifadelerden üretilir; içerik listesi API'de yok. Tıbbi tavsiye değildir."
+            "Fiyatlar canlı. Sağlık % yalnızca başlık/marka/kategori etiket metninden; "
+            "içerik listesi API'de yok. Tıbbi tavsiye değildir."
         ),
     }

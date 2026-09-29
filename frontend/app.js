@@ -85,6 +85,12 @@ function money(n) {
   }).format(n || 0);
 }
 
+function unitPriceLabel(o) {
+  if (o.unitPriceEstimate == null) return o.unitPrice || "";
+  const unit = o.unitPriceUnit || "kg";
+  return `≈ ${Number(o.unitPriceEstimate).toFixed(0)} ₺/${unit}`;
+}
+
 function lowestPrice(offers) {
   const prices = (offers || [])
     .map((o) => Number(o.price))
@@ -327,13 +333,13 @@ function renderVolumeChips(options) {
 }
 
 function scoreRow(label, score) {
-  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const s = Math.max(0, Math.min(100, Number(score ?? 50)));
   const hue = Math.round((s / 100) * 120);
   return `
     <div class="score-row">
       <span class="score-label">${label}</span>
       <div class="bar-track"><i style="width:${s}%;background:hsl(${hue} 75% 48%)"></i></div>
-      <span class="score-num">${s}</span>
+      <span class="score-num">${s}%</span>
     </div>`;
 }
 
@@ -428,10 +434,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
   const valueBadge = o.valuePick
     ? `<span class="value-badge">Tahmin: uygun fiyat + sade etiket</span>`
     : "";
-  const unit =
-    o.unitPriceEstimate != null
-      ? `≈ ${Number(o.unitPriceEstimate).toFixed(0)} ₺/birim`
-      : o.unitPrice || "";
+  const unit = unitPriceLabel(o);
   return `
     <article class="offer ${o.valuePick ? "value-pick" : ""} ${best ? "best-deal" : ""}" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s">
       ${img}
@@ -448,8 +451,8 @@ function offerCardHtml(o, idx, bestPrice = null) {
           ${o.updatedAt ? `<span>güncelleme ${escapeHtml(o.updatedAt)}</span>` : ""}
           ${o.discount ? `<span class="pill-discount">kaynak: indirimli</span>` : ""}
         </div>
-        <div class="score-bars" title="Kaynak metni taraması — laboratuvar skoru değil">
-          ${scoreRow("Etiket", o.healthScore)}
+        <div class="score-bars" title="Kaynak başlık/etiket metni taraması — laboratuvar sağlık skoru değil">
+          ${scoreRow("Sağlık", o.healthScore)}
           ${scoreRow("Fiyat", o.economyScore)}
         </div>
         <div class="evidence-block">
@@ -485,12 +488,17 @@ function paintTable(offers) {
       const isBest = isBestPrice(o, best);
       const unit =
         o.unitPriceEstimate != null
-          ? `${Number(o.unitPriceEstimate).toFixed(0)}`
+          ? unitPriceLabel(o).replace(/^≈\s*/, "")
           : o.unitPriceValue != null
             ? String(o.unitPriceValue)
             : "—";
       return `<tr class="${isBest ? "best-deal" : ""}">
-        <td class="td-title">${escapeHtml(o.title)}${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}</td>
+        <td class="td-title">${escapeHtml(o.title)}${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
+          <div class="score-bars compact table-scores" title="${escapeHtml(o.analysisNote || "Etiket taraması")}">
+            ${scoreRow("Sağlık", o.healthScore)}
+            ${scoreRow("Fiyat", o.economyScore)}
+          </div>
+        </td>
         <td><span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
           ${o.depotName ? `<div class="muted tiny">${escapeHtml(o.depotName)}</div>` : ""}
         </td>
@@ -530,9 +538,14 @@ function paintGrouped(groups) {
             <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
             <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}${isBest ? ` · En uygun` : ""}</span>
             <span class="group-price ${isBest ? "best" : ""}">${money(o.price)}</span>
-            <span class="muted tiny">${o.unitPriceEstimate != null ? `≈ ${Number(o.unitPriceEstimate).toFixed(0)} birim` : o.unitPrice || ""}</span>
+            <span class="muted tiny" title="Tahmini birim fiyat (paket ÷ miktar)">${escapeHtml(unitPriceLabel(o) || o.unitPrice || "")}</span>
+            <div class="score-bars compact" title="${escapeHtml(o.analysisNote || "Etiket metni taraması — laboratuvar skoru değil")}">
+              ${scoreRow("Sağlık", o.healthScore)}
+              ${scoreRow("Fiyat", o.economyScore)}
+            </div>
             ${trendBadge(o)}
             <button class="add-btn compact" data-idx="${realIdx}">Ekle</button>
+            <div class="group-evidence muted tiny">${escapeHtml(((o.labelEvidence || [])[0] || "etiket taraması: nötr"))}</div>
           </div>`;
         })
         .join("");
@@ -594,7 +607,7 @@ function renderRobot(robot) {
   const alt = (robot.alternatives || [])
     .map(
       (a) =>
-        `<span class="robot-alt">${escapeHtml(a.offer.marketLabel)} · ${money(a.offer.price)}</span>`
+        `<span class="robot-alt">${escapeHtml(a.offer.marketLabel)} · ${money(a.offer.price)} · sağlık ${a.healthScore ?? "—"}%</span>`
     )
     .join("");
   const idx = state.offers.findIndex(
@@ -603,18 +616,22 @@ function renderRobot(robot) {
   els.robotCard.hidden = false;
   els.robotCard.innerHTML = `
     <div class="robot-head">
-      <span class="robot-badge">Kıyas robotu</span>
+      <span class="robot-badge">Kıyas robotu · öneri</span>
       <span class="robot-score">skor ${pick.score}</span>
     </div>
     <p class="robot-title">${escapeHtml(o.title)}</p>
     <p class="robot-summary">${escapeHtml(pick.summary || "")}</p>
-    <ul class="robot-reasons">${reasons}</ul>
+    <div class="score-bars robot-bars" title="${escapeHtml(o.analysisNote || "Etiket metni taraması")}">
+      ${scoreRow("Sağlık", pick.healthScore)}
+      ${scoreRow("Fiyat", pick.economyScore)}
+    </div>
+    <h4 class="robot-why-title">${escapeHtml(pick.whyTitle || "Neden önerildi")}</h4>
+    <ul class="robot-reasons">${reasons || "<li>Gerekçe üretilemedi</li>"}</ul>
     <div class="robot-meta">
       <span class="market-badge"><i style="background:${o.marketColor || "#999"}"></i>${escapeHtml(o.marketLabel)}</span>
       <strong class="robot-price">${money(o.price)}</strong>
       ${o.volume ? `<span>${escapeHtml(o.volume)}</span>` : ""}
-      <span>etiket ${pick.healthScore}/100</span>
-      <span>fiyat ${pick.economyScore}/100</span>
+      ${unitPriceLabel(o) ? `<span>${escapeHtml(unitPriceLabel(o))}</span>` : ""}
     </div>
     ${alt ? `<div class="robot-alts">Alternatif: ${alt}</div>` : ""}
     <p class="robot-disclaimer">${escapeHtml(robot.disclaimer || "")}</p>
