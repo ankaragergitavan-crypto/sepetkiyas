@@ -36,6 +36,8 @@ const els = {
   grandTotal: document.getElementById("grandTotal"),
   viewToggle: document.getElementById("viewToggle"),
   clearCarts: document.getElementById("clearCarts"),
+  downloadCartPdf: document.getElementById("downloadCartPdf"),
+  pdfMsg: document.getElementById("pdfMsg"),
   installHint: document.getElementById("installHint"),
   installBtn: document.getElementById("installBtn"),
   desktopBtn: document.getElementById("desktopBtn"),
@@ -160,6 +162,11 @@ function setupInstall() {
 }
 
 async function boot() {
+  fitViewportToScreen();
+  window.addEventListener("resize", fitViewportToScreen);
+  window.visualViewport?.addEventListener("resize", fitViewportToScreen);
+  window.visualViewport?.addEventListener("scroll", fitViewportToScreen);
+
   registerPwa();
   setupInstall();
   startTimerLoop();
@@ -244,6 +251,26 @@ function changeQty(marketId, itemId, delta) {
   renderCarts();
 }
 
+function removeFromCart(marketId, itemId) {
+  const list = state.carts[marketId] || [];
+  state.carts[marketId] = list.filter((i) => i.id !== itemId);
+  if (!state.carts[marketId]?.length) delete state.carts[marketId];
+  saveCarts();
+  renderCarts();
+}
+
+function fitViewportToScreen() {
+  const vv = window.visualViewport;
+  const h = vv?.height || window.innerHeight || document.documentElement.clientHeight;
+  if (h > 0) {
+    document.documentElement.style.setProperty("--app-vh", `${Math.round(h)}px`);
+  }
+  document.documentElement.style.setProperty(
+    "--gutter-safe",
+    `max(${getComputedStyle(document.documentElement).getPropertyValue("--gutter").trim() || "0.75rem"}, env(safe-area-inset-left), env(safe-area-inset-right))`
+  );
+}
+
 function renderCarts() {
   const count = cartCount();
   els.cartBadge.textContent = String(count);
@@ -262,10 +289,13 @@ function renderCarts() {
       els.cartGroupTotals.hidden = true;
       els.cartGroupTotals.innerHTML = "";
     }
+    if (els.downloadCartPdf) els.downloadCartPdf.disabled = true;
     els.cartPanels.innerHTML =
       '<p class="muted">Henüz ürün yok. Sonuçlardan “Sepete ekle” ile market bazlı sepet doldurun.</p>';
     return;
   }
+
+  if (els.downloadCartPdf) els.downloadCartPdf.disabled = false;
 
   const totals = ids.map((marketId) => {
     const items = state.carts[marketId];
@@ -322,10 +352,13 @@ function renderCarts() {
               <div>
                 <div>${escapeHtml(item.title)}</div>
                 <div class="muted tiny">${money(item.price)} × ${item.qty}</div>
-                <div class="qty-row">
-                  <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="-1">−</button>
-                  <span>${item.qty}</span>
-                  <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="1">+</button>
+                <div class="cart-item-actions">
+                  <div class="qty-row">
+                    <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="-1" aria-label="Azalt">−</button>
+                    <span>${item.qty}</span>
+                    <button class="qty-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-delta="1" aria-label="Artır">+</button>
+                  </div>
+                  <button type="button" class="remove-item-btn" data-market="${marketId}" data-id="${escapeHtml(item.id)}" data-remove="1">Kaldır</button>
                 </div>
               </div>
               <div class="line-total">${money(item.price * item.qty)}</div>
@@ -926,9 +959,62 @@ els.viewToggle?.addEventListener("click", (e) => {
 });
 
 els.cartPanels.addEventListener("click", (e) => {
+  const removeBtn = e.target.closest(".remove-item-btn");
+  if (removeBtn) {
+    removeFromCart(removeBtn.dataset.market, removeBtn.dataset.id);
+    return;
+  }
   const btn = e.target.closest(".qty-btn");
   if (!btn) return;
   changeQty(btn.dataset.market, btn.dataset.id, Number(btn.dataset.delta));
+});
+
+async function downloadCartsPdf() {
+  if (!els.downloadCartPdf || !Object.keys(state.carts).length) return;
+  const city = selectedCity();
+  els.downloadCartPdf.disabled = true;
+  if (els.pdfMsg) {
+    els.pdfMsg.hidden = false;
+    els.pdfMsg.textContent = "PDF hazırlanıyor…";
+  }
+  try {
+    const res = await fetch("/api/carts/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        carts: state.carts,
+        cityLabel: city?.label || "Ankara",
+        note: `Oluşturma: ${new Date().toLocaleString("tr-TR")}`,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "PDF indirilemedi");
+    }
+    const blob = await res.blob();
+    const stamp = new Date()
+      .toISOString()
+      .slice(0, 16)
+      .replace("T", "_")
+      .replace(":", "-");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sepetkiyas-sepetler-${stamp}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    if (els.pdfMsg) els.pdfMsg.textContent = "PDF indirildi.";
+  } catch (err) {
+    if (els.pdfMsg) els.pdfMsg.textContent = err.message || "PDF hatası";
+  } finally {
+    els.downloadCartPdf.disabled = !Object.keys(state.carts).length;
+  }
+}
+
+els.downloadCartPdf?.addEventListener("click", () => {
+  downloadCartsPdf();
 });
 
 els.cartToggle.addEventListener("click", () => openDrawer(true));

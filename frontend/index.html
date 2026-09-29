@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="theme-color" content="#0f1a14" />
     <meta name="color-scheme" content="dark" />
@@ -147,7 +147,13 @@
           <span>Tüm sepetler toplamı</span>
           <strong id="grandTotal">0,00 ₺</strong>
         </div>
-        <button type="button" class="ghost-btn" id="clearCarts">Tüm sepetleri temizle</button>
+        <div class="drawer-actions">
+          <button type="button" class="ghost-btn" id="downloadCartPdf" disabled>
+            PDF indir (tarihli)
+          </button>
+          <button type="button" class="ghost-btn" id="clearCarts">Tüm sepetleri temizle</button>
+        </div>
+        <p class="muted tiny" id="pdfMsg" hidden></p>
       </div>
     </aside>
     <div class="scrim" id="scrim" hidden></div>

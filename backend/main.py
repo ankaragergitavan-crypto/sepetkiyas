@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -29,6 +30,7 @@ from .robot import annotate_offers, build_robot_pick
 from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
 from .product_content import build_product_content
+from .cart_pdf import build_carts_pdf
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -350,6 +352,50 @@ async def product_content_get(
     brand: str | None = None,
 ) -> dict[str, Any]:
     return await build_product_content({"title": title, "brand": brand})
+
+
+class CartItemIn(BaseModel):
+    id: str
+    title: str = ""
+    price: float = 0
+    qty: int = 1
+    marketId: str | None = None
+    marketLabel: str | None = None
+
+
+class CartsPdfBody(BaseModel):
+    carts: dict[str, list[CartItemIn]]
+    cityLabel: str | None = "Ankara"
+    note: str | None = None
+
+
+@app.post("/api/carts/pdf")
+async def carts_pdf(body: CartsPdfBody) -> Response:
+    """Sepetleri tarihli detaylı PDF olarak indir (telefon/PC)."""
+    payload = {
+        "carts": {
+            mid: [i.model_dump() for i in items if int(i.qty or 0) > 0]
+            for mid, items in (body.carts or {}).items()
+        },
+        "cityLabel": body.cityLabel or "Ankara",
+        "note": body.note or "",
+    }
+    try:
+        pdf_bytes = build_carts_pdf(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"PDF oluşturulamadı: {exc}") from exc
+
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"sepetkiyas-sepetler-{stamp}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/aktuel")
