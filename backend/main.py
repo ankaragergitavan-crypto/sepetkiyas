@@ -31,6 +31,7 @@ from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
 from .product_content import build_product_content
 from .cart_pdf import build_carts_pdf
+from .barcode_lookup import lookup_barcode
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -396,6 +397,12 @@ async def carts_pdf(body: CartsPdfBody) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/api/barcode/{code}")
+async def barcode_lookup(code: str) -> dict[str, Any]:
+    """Foto/kameradan okunan barkod → ürün adı önerisi."""
+    return await lookup_barcode(code)
 
 
 @app.get("/api/aktuel")

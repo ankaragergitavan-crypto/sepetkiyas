@@ -38,6 +38,14 @@ const els = {
   clearCarts: document.getElementById("clearCarts"),
   downloadCartPdf: document.getElementById("downloadCartPdf"),
   pdfMsg: document.getElementById("pdfMsg"),
+  scanCameraBtn: document.getElementById("scanCameraBtn"),
+  scanGalleryBtn: document.getElementById("scanGalleryBtn"),
+  scanFileInput: document.getElementById("scanFileInput"),
+  scanGalleryInput: document.getElementById("scanGalleryInput"),
+  scanStatus: document.getElementById("scanStatus"),
+  scanModal: document.getElementById("scanModal"),
+  closeScanModal: document.getElementById("closeScanModal"),
+  scanLiveStatus: document.getElementById("scanLiveStatus"),
   installHint: document.getElementById("installHint"),
   installBtn: document.getElementById("installBtn"),
   desktopBtn: document.getElementById("desktopBtn"),
@@ -905,17 +913,22 @@ function renderOffers(payload) {
 els.quickQueries?.addEventListener("click", (e) => {
   const btn = e.target.closest(".quick-chip");
   if (!btn) return;
-  els.query.value = btn.dataset.q || btn.textContent || "";
-  els.form.requestSubmit();
+  runSearch(btn.dataset.q || btn.textContent || "");
 });
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const query = els.query.value.trim();
+  await runSearch(els.query.value.trim());
+});
+
+async function runSearch(rawQuery, meta = {}) {
+  const query = String(rawQuery || "").trim();
   if (!query) return;
+  els.query.value = query;
   const city = selectedCity();
   els.searchBtn.disabled = true;
   els.searchBtn.textContent = "Taranıyor…";
+  setScanStatus(meta.status || `Aranıyor: ${query}`);
   try {
     const res = await fetch("/api/search", {
       method: "POST",
@@ -930,15 +943,280 @@ els.form.addEventListener("submit", async (e) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Arama başarısız");
     renderOffers(data);
+    if (meta.note) setScanStatus(meta.note, false);
+    else setScanStatus("", true);
   } catch (err) {
     els.emptyState.hidden = false;
     els.resultsSection.hidden = true;
     els.emptyState.innerHTML = `<p>Canlı arama hatası: ${escapeHtml(err.message)}</p>`;
+    setScanStatus(err.message || "Arama hatası", false);
   } finally {
     els.searchBtn.disabled = false;
     els.searchBtn.textContent = "Karşılaştır";
     syncTimer();
   }
+}
+
+function setScanStatus(text, hide = false) {
+  if (!els.scanStatus) return;
+  if (hide || !text) {
+    els.scanStatus.hidden = true;
+    els.scanStatus.textContent = "";
+    return;
+  }
+  els.scanStatus.hidden = false;
+  els.scanStatus.textContent = text;
+}
+
+let html5QrLibPromise = null;
+let tesseractPromise = null;
+let liveScanner = null;
+let scanBusy = false;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Script yüklenemedi: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureHtml5Qrcode() {
+  if (window.Html5Qrcode) return window.Html5Qrcode;
+  if (!html5QrLibPromise) {
+    html5QrLibPromise = loadScript(
+      "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+    ).then(() => {
+      if (!window.Html5Qrcode) throw new Error("Barkod motoru yüklenemedi");
+      return window.Html5Qrcode;
+    });
+  }
+  return html5QrLibPromise;
+}
+
+async function ensureTesseract() {
+  if (window.Tesseract) return window.Tesseract;
+  if (!tesseractPromise) {
+    tesseractPromise = loadScript(
+      "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"
+    ).then(() => {
+      if (!window.Tesseract) throw new Error("OCR motoru yüklenemedi");
+      return window.Tesseract;
+    });
+  }
+  return tesseractPromise;
+}
+
+function cleanOcrQuery(text) {
+  const lines = String(text || "")
+    .split(/\n+/)
+    .map((l) => l.replace(/[^\p{L}\p{N}\s.%/-]/gu, " ").replace(/\s+/g, " ").trim())
+    .filter((l) => l.length >= 3);
+  const stop = new Set([
+    "içindekiler",
+    "icerikler",
+    "besin",
+    "değer",
+    "deger",
+    "enerji",
+    "protein",
+    "yağ",
+    "yag",
+    "karbonhidrat",
+    "üretici",
+    "uretici",
+    "ithalatçı",
+    "ithalatci",
+    "saklama",
+    "son",
+    "kullanma",
+    "tarihi",
+    "net",
+    "ağırlık",
+    "agirlik",
+  ]);
+  const scored = lines
+    .map((l) => {
+      const words = l.split(" ").filter((w) => w.length > 1 && !stop.has(w.toLowerCase()));
+      return { l: words.join(" "), n: words.length };
+    })
+    .filter((x) => x.n >= 1)
+    .sort((a, b) => b.n - a.n);
+  const pick = scored.slice(0, 2).map((x) => x.l).join(" ").trim();
+  return pick.slice(0, 80);
+}
+
+async function lookupBarcodeAndSearch(code) {
+  setScanStatus(`Barkod okundu: ${code} · ürün adı aranıyor…`);
+  const res = await fetch(`/api/barcode/${encodeURIComponent(code)}`);
+  const data = await res.json();
+  const query = data.query || code;
+  await runSearch(query, {
+    note: data.note || `Barkod ${code} ile arandı.`,
+    status: `Barkod → ${query}`,
+  });
+}
+
+async function ocrImageAndSearch(file) {
+  setScanStatus("Barkod yok · etiket metni okunuyor (OCR)…");
+  const Tesseract = await ensureTesseract();
+  const result = await Tesseract.recognize(file, "tur+eng", {
+    logger: (m) => {
+      if (m.status === "recognizing text" && els.scanStatus) {
+        const pct = Math.round((m.progress || 0) * 100);
+        els.scanStatus.textContent = `Etiket okunuyor… %${pct}`;
+      }
+    },
+  });
+  const query = cleanOcrQuery(result?.data?.text || "");
+  if (!query || query.length < 3) {
+    setScanStatus(
+      "Fotoğraftan ürün adı okunamadı. Daha net çekin veya elle yazın.",
+      false
+    );
+    return;
+  }
+  await runSearch(query, {
+    note: `Etiketten okunan metinle arandı: “${query}”`,
+    status: `OCR → ${query}`,
+  });
+}
+
+async function processScanFile(file) {
+  if (!file || scanBusy) return;
+  scanBusy = true;
+  try {
+    setScanStatus("Görüntü işleniyor…");
+    const Html5Qrcode = await ensureHtml5Qrcode();
+    // gizli reader elemanı
+    let holder = document.getElementById("scanFileReader");
+    if (!holder) {
+      holder = document.createElement("div");
+      holder.id = "scanFileReader";
+      holder.hidden = true;
+      document.body.appendChild(holder);
+    }
+    const scanner = new Html5Qrcode("scanFileReader");
+    try {
+      const decoded = await scanner.scanFile(file, false);
+      await scanner.clear().catch(() => {});
+      if (decoded) {
+        await lookupBarcodeAndSearch(String(decoded).trim());
+        return;
+      }
+    } catch {
+      await scanner.clear().catch(() => {});
+    }
+    await ocrImageAndSearch(file);
+  } catch (err) {
+    setScanStatus(err.message || "Tarama başarısız", false);
+  } finally {
+    scanBusy = false;
+    if (els.scanFileInput) els.scanFileInput.value = "";
+    if (els.scanGalleryInput) els.scanGalleryInput.value = "";
+  }
+}
+
+async function openLiveScanner() {
+  const Html5Qrcode = await ensureHtml5Qrcode();
+  if (!els.scanModal) return;
+  els.scanModal.hidden = false;
+  els.scanModal.setAttribute("aria-hidden", "false");
+  if (els.scanLiveStatus) els.scanLiveStatus.textContent = "Kamera açılıyor…";
+  const formats = window.Html5QrcodeSupportedFormats
+    ? [
+        window.Html5QrcodeSupportedFormats.EAN_13,
+        window.Html5QrcodeSupportedFormats.EAN_8,
+        window.Html5QrcodeSupportedFormats.UPC_A,
+        window.Html5QrcodeSupportedFormats.UPC_E,
+        window.Html5QrcodeSupportedFormats.CODE_128,
+        window.Html5QrcodeSupportedFormats.QR_CODE,
+      ]
+    : undefined;
+  liveScanner = new Html5Qrcode("scanReader", formats ? { formatsToSupport: formats } : undefined);
+  try {
+    await liveScanner.start(
+      { facingMode: "environment" },
+      { fps: 8, qrbox: { width: 260, height: 160 } },
+      async (decodedText) => {
+        if (scanBusy) return;
+        scanBusy = true;
+        try {
+          await stopLiveScanner();
+          await lookupBarcodeAndSearch(String(decodedText).trim());
+        } finally {
+          scanBusy = false;
+        }
+      },
+      () => {}
+    );
+    if (els.scanLiveStatus) {
+      els.scanLiveStatus.textContent = "Barkodu çerçeveye hizalayın.";
+    }
+  } catch (err) {
+    if (els.scanLiveStatus) {
+      els.scanLiveStatus.textContent =
+        err?.message ||
+        "Kamera açılamadı. Galeri/foto seçeneğini kullanın veya tarayıcı izni verin.";
+    }
+  }
+}
+
+async function stopLiveScanner() {
+  if (liveScanner) {
+    try {
+      await liveScanner.stop();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await liveScanner.clear();
+    } catch {
+      /* ignore */
+    }
+    liveScanner = null;
+  }
+  if (els.scanModal) {
+    els.scanModal.hidden = true;
+    els.scanModal.setAttribute("aria-hidden", "true");
+  }
+}
+
+els.scanCameraBtn?.addEventListener("click", () => {
+  // Mobilde önce capture ile doğrudan kamera; masaüstünde canlı tarayıcı
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile && els.scanFileInput) {
+    els.scanFileInput.click();
+  } else {
+    openLiveScanner();
+  }
+});
+
+els.scanGalleryBtn?.addEventListener("click", () => {
+  els.scanGalleryInput?.click();
+});
+
+els.scanFileInput?.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if (file) processScanFile(file);
+});
+
+els.scanGalleryInput?.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if (file) processScanFile(file);
+});
+
+els.closeScanModal?.addEventListener("click", () => stopLiveScanner());
+els.scanModal?.addEventListener("click", (e) => {
+  if (e.target === els.scanModal) stopLiveScanner();
 });
 
 els.offerList.addEventListener("click", (e) => {
