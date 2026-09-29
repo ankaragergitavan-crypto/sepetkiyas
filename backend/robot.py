@@ -6,29 +6,41 @@ from typing import Any
 from .relevance import fold_tr
 from .volume import normalize_volume_label, volume_sort_key
 
-# Etiket metni sinyalleri — laboratuvar/sağlık belgesi değil; yalnızca kaynakta geçen ifadeler.
+# Tüm ürünler için kaynak metni sinyalleri (başlık/kategori/marka). Lab skoru değil.
 _LABEL_PLUS = [
     (r"\borganik\b", 16, "organik"),
     (r"\bkatkisiz\b|\bkatkısız\b", 10, "katkısız"),
     (r"\bsekersiz\b|\bşekersiz\b", 10, "şekersiz"),
+    (r"\btuzsuz\b", 6, "tuzsuz"),
     (r"\btam\s*bugday\b|\btam\s*buğday\b", 10, "tam buğday"),
-    (r"\bzeytinyagi\b|\bzeytinyağı\b", 8, "zeytinyağı"),
-    (r"\bfermente\b", 8, "fermente"),
+    (r"\bcavdar\b|\bçavdar\b|\byulaf\b", 8, "çavdar/yulaf"),
+    (r"\bzeytinyagi\b|\bzeytinyağı\b|\bnatürel\b|\bsızma\b", 10, "zeytinyağı/sızma"),
+    (r"\bfermente\b|\bprobiyotik\b", 8, "fermente/probiyotik"),
     (r"\beski\s*kasar\b|\bkars\s*kasar\b", 10, "eski/Kars kaşar"),
     (r"\btaze\b", 4, "taze"),
     (r"\bsade\b", 4, "sade"),
     (r"\bdogal\b|\bdoğal\b", 4, "doğal"),
     (r"\bgunluk\b|\bgünlük\b", 4, "günlük"),
-    (r"\bozel\s*yumurta|\bözel\s*yumurta", 6, "özel yumurta kategorisi"),
+    (r"\bpasteurize\b|\bpastorize\b|\bpastörize\b", 3, "pastörize"),
+    (r"\btam\s*yagli\b|\btam\s*yağlı\b", 3, "tam yağlı"),
+    (r"\byagisz\b|\byağsız\b|\byarim\s*yagli\b|\byarım\s*yağlı\b", 3, "yağ oranı belirtilmiş"),
+    (r"\bkeçi\b|\bkecı\b|\bkeci\b", 4, "keçi"),
+    (r"\bdana\b|\bkuzu\b|\bpili[cç]\b|\btavuk\b", 2, "et türü belirtilmiş"),
+    (r"\brife\b|\brifle\b|\b%100\b|\b100\s*%", 4, "saf/oran vurgusu"),
+    (r"\bozel\s*yumurta|\bözel\s*yumurta|\bkgb\b|\bgezen\b|\bkafessiz\b", 6, "özel yumurta/gezen"),
+    (r"\bglütensiz\b|\bglutensiz\b|\bgluten\s*free\b", 6, "glutensiz"),
+    (r"\bseker\s*ilavesiz\b|\bşeker\s*ilavesiz\b", 8, "şeker ilavesiz"),
 ]
 _LABEL_MINUS = [
-    (r"\baromali\b|\baromalı\b", 14, "aromalı"),
+    (r"\baromali\b|\baromalı\b|\baroma\b", 12, "aroma/aromalı"),
     (r"\bislenmis\b|\bişlenmiş\b", 14, "işlenmiş"),
-    (r"\bglikoz\b|\bfruktoz\b|\baspartam\b", 16, "şeker katkı sinyali"),
+    (r"\bglikoz\b|\bfruktoz\b|\baspartam\b|\bglukoz\b", 16, "şeker katkı sinyali"),
     (r"\bmargarin\b|\btrans\s*yag\b|\btrans\s*yağ\b", 16, "margarin/trans yağ"),
-    (r"\bkraker\b|\bcips\b|\bbiskuvi\b|\bbisküvi\b|\bgofret\b", 18, "atıştırmalık"),
-    (r"\bspread\b|\beritme\b", 10, "eritme/spread"),
-    (r"\bsoslu\b|\bacili\b|\bacılı\b", 8, "soslu/acılı"),
+    (r"\bkraker\b|\bcips\b|\bbiskuvi\b|\bbisküvi\b|\bgofret\b|\bcikolata\b|\bçikolata\b", 14, "atıştırmalık/tatlı"),
+    (r"\bspread\b|\beritme\b|\bkrem\s*peynir\s*arom", 10, "eritme/spread"),
+    (r"\bsoslu\b|\bacili\b|\bacılı\b|\bbaharatli\b|\bbaharatl[ıi]\b", 6, "soslu/baharatlı"),
+    (r"\bhazir\b|\bhazır\b|\benstantane\b", 6, "hazır ürün"),
+    (r"\bkoncentre\b|\bkonsantre\b|\bnektar\b", 5, "konsantre/nektar"),
 ]
 
 
@@ -146,6 +158,17 @@ def annotate_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
             units.append(up)
 
     for o, up in zip(offers, parsed):
+        # Zaten tarandıysa tekrar bozma (main + robot çift çağrı)
+        if o.get("scoreKind") == "live_price_plus_source_text_evidence" and "labelEvidence" in o:
+            # ekonomi skorunu güncel birim listesine göre yenile
+            e_score, e_reason = _economy_score(up, float(o["price"]), units)
+            o["economyScore"] = e_score
+            o["unitPriceEstimate"] = round(up, 2) if up else o.get("unitPriceEstimate")
+            hints = o.get("scoreHints") or {}
+            hints["economyReason"] = e_reason
+            o["scoreHints"] = hints
+            o["valuePick"] = e_score >= 65 and int(o.get("healthScore") or 0) >= 58
+            continue
         h_score, evidence, notes = _label_evidence_score(
             o.get("title") or "", o.get("brand"), o
         )

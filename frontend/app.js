@@ -407,18 +407,23 @@ function paintOffers() {
               ${o.updatedAt ? `<span>güncelleme ${escapeHtml(o.updatedAt)}</span>` : ""}
               ${o.discount ? `<span class="pill-discount">kaynak: indirimli</span>` : ""}
             </div>
-            <div class="score-bars" title="Kaynak metninden kanıt — laboratuvar skoru değil">
+            <div class="score-bars" title="Her üründe kaynak metni taranır — laboratuvar skoru değil">
               ${scoreRow("Etiket", o.healthScore)}
               ${scoreRow("Fiyat", o.economyScore)}
             </div>
-            ${
-              (o.labelEvidence || []).length
-                ? `<ul class="evidence-list">${(o.labelEvidence || [])
-                    .slice(0, 3)
-                    .map((e) => `<li>${escapeHtml(e)}</li>`)
-                    .join("")}</ul>`
-                : ""
-            }
+            <div class="evidence-block">
+              <span class="evidence-title">Etiket taraması</span>
+              <ul class="evidence-list">
+                ${(o.labelNotes || [])
+                  .slice(0, 1)
+                  .map((e) => `<li>${escapeHtml(e)}</li>`)
+                  .join("")}
+                ${(o.labelEvidence || ["güçlü etiket sinyali yok (nötr)"])
+                  .slice(0, 4)
+                  .map((e) => `<li>${escapeHtml(e)}</li>`)
+                  .join("")}
+              </ul>
+            </div>
           </div>
           <div class="offer-side">
             <div class="price-wrap">

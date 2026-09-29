@@ -24,7 +24,7 @@ from .markets import (
     clamp_to_ankara,
 )
 from .relevance import is_relevant, relevance_score
-from .robot import build_robot_pick
+from .robot import annotate_offers, build_robot_pick
 from .price_trend import apply_price_trends
 from .volume import extract_volume_options, filter_offers_by_volume, normalize_volume_label
 
@@ -243,6 +243,8 @@ async def search(body: SearchBody) -> dict[str, Any]:
 
     # Gerçek fiyat değişimi (önceki arama kaydı); yoksa ok yok
     apply_price_trends(result["offers"])
+    # TÜM tekliflerde etiket taraması (yumurta vb. tek kategori değil)
+    annotate_offers(result["offers"])
 
     robot = build_robot_pick(result["offers"], query)
 
