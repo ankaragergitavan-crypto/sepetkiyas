@@ -527,7 +527,10 @@ async def install_desktop() -> dict[str, Any]:
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(
+        STATIC / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/sw.js")
@@ -535,14 +538,38 @@ async def service_worker() -> FileResponse:
     return FileResponse(
         STATIC / "sw.js",
         media_type="application/javascript",
-        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Service-Worker-Allowed": "/",
+        },
+    )
+
+
+@app.get("/static/app.js")
+async def static_app_js() -> FileResponse:
+    return FileResponse(
+        STATIC / "app.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/static/styles.css")
+async def static_styles_css() -> FileResponse:
+    return FileResponse(
+        STATIC / "styles.css",
+        media_type="text/css",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
 
 @app.get("/manifest.webmanifest")
 async def manifest_root() -> FileResponse:
-    return FileResponse(STATIC / "manifest.webmanifest", media_type="application/manifest+json")
-
+    return FileResponse(
+        STATIC / "manifest.webmanifest",
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 @app.get("/robots.txt")
 async def robots() -> PlainTextResponse:

@@ -18,6 +18,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <link rel="manifest" href="/static/manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
@@ -28,7 +29,39 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=18" />
+    <script>
+      /* Eski service worker / bozuk cache butonları öldürüyordu — bir kez temizle */
+      (function () {
+        var BUILD = "18";
+        try {
+          if (localStorage.getItem("agt_build") === BUILD) return;
+          localStorage.setItem("agt_build", BUILD);
+          var done = function () {
+            var u = new URL(location.href);
+            if (u.searchParams.get("b") === BUILD) return;
+            u.searchParams.set("b", BUILD);
+            location.replace(u.toString());
+          };
+          var tasks = [];
+          if ("serviceWorker" in navigator) {
+            tasks.push(
+              navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+              })
+            );
+          }
+          if ("caches" in window) {
+            tasks.push(
+              caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              })
+            );
+          }
+          Promise.all(tasks).then(done).catch(done);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div class="bg-grid" aria-hidden="true"></div>
@@ -80,14 +113,15 @@
           <div class="city-field">
             <label for="city">Ankara ilçe</label>
             <select id="city" name="city" aria-label="Ankara ilçe seçin">
-              <option value="ankara-kecioren">Ankara · Keçiören</option>
-              <option value="ankara-cankaya" selected>Ankara · Çankaya</option>
-              <option value="ankara-yenimahalle">Ankara · Yenimahalle</option>
-              <option value="ankara-mamak">Ankara · Mamak</option>
-              <option value="ankara-etimesgut">Ankara · Etimesgut</option>
-              <option value="ankara-sincan">Ankara · Sincan</option>
-              <option value="ankara-pursaklar">Ankara · Pursaklar</option>
+              <option value="ankara-kecioren" data-lat="39.9777" data-lon="32.8670">Ankara · Keçiören</option>
+              <option value="ankara-cankaya" data-lat="39.9208" data-lon="32.8541" selected>Ankara · Çankaya</option>
+              <option value="ankara-yenimahalle" data-lat="39.9667" data-lon="32.8111">Ankara · Yenimahalle</option>
+              <option value="ankara-mamak" data-lat="39.9200" data-lon="32.9100">Ankara · Mamak</option>
+              <option value="ankara-etimesgut" data-lat="39.9500" data-lon="32.6700">Ankara · Etimesgut</option>
+              <option value="ankara-sincan" data-lat="39.9660" data-lon="32.5800">Ankara · Sincan</option>
+              <option value="ankara-pursaklar" data-lat="40.0400" data-lon="32.9000">Ankara · Pursaklar</option>
             </select>
+            <button type="button" class="ghost-btn tiny-btn" id="geoBtn">Konumumu kullan</button>
           </div>
           <button type="submit" id="searchBtn">Ara / Karşılaştır</button>
         </form>
@@ -242,6 +276,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=17" defer></script>
+    <script src="/static/app.js?v=18" defer></script>
   </body>
 </html>

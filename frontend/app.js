@@ -61,6 +61,7 @@ const els = {
   installHint: document.getElementById("installHint"),
   installBtn: document.getElementById("installBtn"),
   installHintText: document.getElementById("installHintText"),
+  geoBtn: document.getElementById("geoBtn"),
   desktopBtn: document.getElementById("desktopBtn"),
   desktopMsg: document.getElementById("desktopMsg"),
   tabSearch: document.getElementById("tabSearch"),
@@ -158,7 +159,96 @@ function selectedCity() {
         { id: "ankara-pursaklar", label: "Ankara · Pursaklar", lat: 40.04, lon: 32.9 },
       ];
   const id = els.city?.value;
-  return presets.find((c) => c.id === id) || presets[0] || fallback;
+  const fromState = presets.find((c) => c.id === id);
+  if (fromState) return fromState;
+  // HTML option data-lat/lon yedek
+  const opt = els.city?.selectedOptions?.[0];
+  if (opt?.dataset?.lat && opt?.dataset?.lon) {
+    return {
+      id: opt.value,
+      label: opt.textContent.trim(),
+      lat: Number(opt.dataset.lat),
+      lon: Number(opt.dataset.lon),
+    };
+  }
+  return presets[0] || fallback;
+}
+
+function cityDistanceKm(lat1, lon1, lat2, lon2) {
+  const r = 6371;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dphi = ((lat2 - lat1) * Math.PI) / 180;
+  const dlmb = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dphi / 2) ** 2 +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(dlmb / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(a));
+}
+
+function pickCityByCoords(lat, lon) {
+  const list = state.cities?.length
+    ? state.cities
+    : [
+        { id: "ankara-kecioren", label: "Ankara · Keçiören", lat: 39.9777, lon: 32.867 },
+        { id: "ankara-cankaya", label: "Ankara · Çankaya", lat: 39.9208, lon: 32.8541 },
+        { id: "ankara-yenimahalle", label: "Ankara · Yenimahalle", lat: 39.9667, lon: 32.8111 },
+        { id: "ankara-mamak", label: "Ankara · Mamak", lat: 39.92, lon: 32.91 },
+        { id: "ankara-etimesgut", label: "Ankara · Etimesgut", lat: 39.95, lon: 32.67 },
+        { id: "ankara-sincan", label: "Ankara · Sincan", lat: 39.966, lon: 32.58 },
+        { id: "ankara-pursaklar", label: "Ankara · Pursaklar", lat: 40.04, lon: 32.9 },
+      ];
+  let best = null;
+  let bestD = Infinity;
+  for (const c of list) {
+    const d = cityDistanceKm(lat, lon, c.lat, c.lon);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  // Ankara metropol dışıysa seçme
+  if (!best || bestD > 45) return null;
+  return best;
+}
+
+function applyCitySelection(city, note) {
+  if (!city || !els.city) return false;
+  const exists = [...els.city.options].some((o) => o.value === city.id);
+  if (!exists) return false;
+  els.city.value = city.id;
+  els.city.dispatchEvent(new Event("change", { bubbles: true }));
+  if (note) setScanStatus(note, false);
+  return true;
+}
+
+function autoSelectByGeolocation(interactive = false) {
+  if (!navigator.geolocation) {
+    if (interactive) setScanStatus("Bu cihazda konum API’si yok.", false);
+    return;
+  }
+  if (interactive) setScanStatus("Konum alınıyor…", false);
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const city = pickCityByCoords(pos.coords.latitude, pos.coords.longitude);
+      if (city) {
+        applyCitySelection(city, `Konum algılandı: ${city.label}`);
+      } else if (interactive) {
+        setScanStatus("Konum Ankara dışında — ilçeyi elle seçin.", false);
+      }
+    },
+    (err) => {
+      if (interactive) {
+        setScanStatus(
+          err?.code === 1
+            ? "Konum izni kapalı. Ayarlardan konum açın veya ilçeyi elle seçin."
+            : "Konum alınamadı — ilçeyi elle seçin.",
+          false
+        );
+      }
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
+  );
 }
 
 function dismissKeyboard() {
@@ -275,10 +365,17 @@ async function boot() {
   if (els.city && (state.cities || []).length) {
     const prev = els.city.value || "ankara-cankaya";
     els.city.innerHTML = state.cities
-      .map((c) => `<option value="${c.id}">${c.label}</option>`)
+      .map(
+        (c) =>
+          `<option value="${c.id}" data-lat="${c.lat}" data-lon="${c.lon}">${escapeHtml(c.label)}</option>`
+      )
       .join("");
     if ([...els.city.options].some((o) => o.value === prev)) els.city.value = prev;
   }
+
+  // Telefon konumu açıksa en yakın Ankara ilçesini seç
+  autoSelectByGeolocation(false);
+  els.geoBtn?.addEventListener("click", () => autoSelectByGeolocation(true));
 
   if (els.chips) {
     els.chips.innerHTML = (state.markets || [])
@@ -1650,33 +1747,49 @@ els.downloadCartPdf?.addEventListener("click", () => {
   downloadCartsPdf();
 });
 
-els.cartToggle.addEventListener("click", () => openDrawer(true));
-els.closeCart.addEventListener("click", () => openDrawer(false));
-els.scrim.addEventListener("click", () => openDrawer(false));
+els.cartToggle?.addEventListener("click", () => openDrawer(true));
+els.closeCart?.addEventListener("click", () => openDrawer(false));
+els.scrim?.addEventListener("click", () => openDrawer(false));
 els.tabSearch?.addEventListener("click", () => {
   openDrawer(false);
-  els.query.focus();
+  els.query?.focus();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 els.tabCart?.addEventListener("click", () => openDrawer(true));
-els.clearCarts.addEventListener("click", () => {
+els.clearCarts?.addEventListener("click", () => {
   state.carts = {};
   saveCarts();
   renderCarts();
 });
 
 els.desktopBtn?.addEventListener("click", async () => {
-  els.desktopMsg.textContent = "Ekleniyor…";
+  if (els.desktopMsg) els.desktopMsg.textContent = "Ekleniyor…";
   try {
     const res = await fetch("/api/install-desktop", { method: "POST" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Kısayol eklenemedi");
-    els.desktopMsg.textContent = data.message || "Masaüstüne eklendi.";
+    if (els.desktopMsg) els.desktopMsg.textContent = data.message || "Masaüstüne eklendi.";
   } catch (err) {
-    els.desktopMsg.textContent = err.message;
+    if (els.desktopMsg) els.desktopMsg.textContent = err.message;
   }
 });
 
+// Global yedek API — HTML / konsol / eski cache kurtarma
+window.AGT = {
+  search: (q) => runSearch(q || els.query?.value || ""),
+  listScan: () => runListScan(els.listText?.value || ""),
+  pasteList: async () => {
+    const btn = els.listPasteBtn;
+    if (btn) btn.click();
+  },
+  geo: () => autoSelectByGeolocation(true),
+  build: "18",
+};
+
 boot().catch((err) => {
-  els.emptyState.innerHTML = `<p>Uygulama başlatılamadı: ${escapeHtml(err.message)}</p>`;
+  console.error(err);
+  if (els.emptyState) {
+    els.emptyState.hidden = false;
+    els.emptyState.innerHTML = `<p>Uygulama başlatılamadı: ${escapeHtml(err.message)}</p>`;
+  }
 });

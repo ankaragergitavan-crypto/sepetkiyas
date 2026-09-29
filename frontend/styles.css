@@ -1257,6 +1257,18 @@ main {
   z-index: 20;
 }
 
+.scrim[hidden] {
+  display: none !important;
+}
+
+.tiny-btn {
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+  width: fit-content;
+}
+
 .drawer {
   position: fixed;
   top: 0;
