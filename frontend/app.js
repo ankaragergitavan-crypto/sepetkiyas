@@ -1295,13 +1295,61 @@ function renderOffers(payload) {
 els.quickQueries?.addEventListener("click", (e) => {
   const btn = e.target.closest(".quick-chip");
   if (!btn) return;
-  runSearch(btn.dataset.q || btn.textContent || "");
+  const q = btn.dataset.q || btn.textContent || "";
+  if (els.query) els.query.value = q;
+  clearTimeout(autoSearchTimer);
+  lastAutoKey = "";
+  runSearch(q);
 });
+
+let autoSearchTimer = null;
+let lastAutoKey = "";
+let searchInFlight = false;
+
+function autoSearchKey() {
+  return `${String(els.query?.value || "")
+    .trim()
+    .toLocaleLowerCase("tr")}|${els.city?.value || ""}`;
+}
+
+function scheduleAutoSearch({ immediate = false } = {}) {
+  clearTimeout(autoSearchTimer);
+  const kick = () => {
+    const q = String(els.query?.value || "").trim();
+    if (q.length < 2) return;
+    const key = autoSearchKey();
+    if (key === lastAutoKey) return;
+    if (searchInFlight) {
+      // Bitince tekrar dene
+      autoSearchTimer = setTimeout(kick, 350);
+      return;
+    }
+    lastAutoKey = key;
+    runSearch(q, { status: `Otomatik: ${q}`, auto: true });
+  };
+  if (immediate) kick();
+  else autoSearchTimer = setTimeout(kick, 650);
+}
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearTimeout(autoSearchTimer);
   dismissKeyboard();
+  lastAutoKey = autoSearchKey();
   await runSearch(els.query.value.trim());
+});
+
+els.query?.addEventListener("input", () => {
+  scheduleAutoSearch({ immediate: false });
+});
+
+els.query?.addEventListener("change", () => {
+  scheduleAutoSearch({ immediate: true });
+});
+
+els.city?.addEventListener("change", () => {
+  // İlçe değişince aynı ürünü yeniden tara — tekrar Ara demeye gerek yok
+  scheduleAutoSearch({ immediate: true });
 });
 
 els.query?.addEventListener("focus", () => {
@@ -1324,8 +1372,10 @@ async function runSearch(rawQuery, meta = {}) {
     setScanStatus("İlçe seçilemedi — sayfayı yenileyin.", false);
     return;
   }
+  searchInFlight = true;
+  lastAutoKey = autoSearchKey();
   els.searchBtn.disabled = true;
-  els.searchBtn.textContent = "Aranıyor…";
+  els.searchBtn.textContent = meta.auto ? "…" : "Aranıyor…";
   setScanStatus(meta.status || `Tüm marketlerde aranıyor: ${query}`);
   try {
     const res = await apiFetch("/api/search", {
@@ -1342,6 +1392,7 @@ async function runSearch(rawQuery, meta = {}) {
     if (!res.ok) throw new Error(data.detail || "Arama başarısız");
     if (data.query && data.query !== query) {
       els.query.value = data.query;
+      lastAutoKey = autoSearchKey();
     }
     renderOffers(data);
     if (meta.note) setScanStatus(meta.note, false);
@@ -1361,6 +1412,7 @@ async function runSearch(rawQuery, meta = {}) {
     els.emptyState.innerHTML = `<p>Canlı arama hatası: ${escapeHtml(err.message)}</p>`;
     setScanStatus(err.message || "Arama hatası", false);
   } finally {
+    searchInFlight = false;
     els.searchBtn.disabled = false;
     els.searchBtn.textContent = "Ara";
     dismissKeyboard();

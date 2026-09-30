@@ -145,17 +145,6 @@
             autocomplete="off"
             required
           />
-          <label class="sr-only" for="city">Ankara ilçe</label>
-          <select id="city" name="city" aria-label="Ankara ilçe / konum">
-            <option value="ankara-kecioren" data-lat="39.9777" data-lon="32.8670">Keçiören</option>
-            <option value="ankara-cankaya" data-lat="39.9208" data-lon="32.8541" selected>Çankaya</option>
-            <option value="ankara-yenimahalle" data-lat="39.9667" data-lon="32.8111">Yenimahalle</option>
-            <option value="ankara-mamak" data-lat="39.9200" data-lon="32.9100">Mamak</option>
-            <option value="ankara-etimesgut" data-lat="39.9500" data-lon="32.6700">Etimesgut</option>
-            <option value="ankara-sincan" data-lat="39.9660" data-lon="32.5800">Sincan</option>
-            <option value="ankara-pursaklar" data-lat="40.0400" data-lon="32.9000">Pursaklar</option>
-          </select>
-          <button type="button" class="geo-chip" id="geoBtn" title="Konumumu kullan" aria-label="Konumumu kullan">📍</button>
           <button type="submit" class="search-go" id="searchBtn" aria-label="Ara ve karşılaştır">Ara</button>
         </form>
       </div>
@@ -163,6 +152,21 @@
 
     <main>
       <div id="bootBanner" class="boot-banner" hidden></div>
+
+      <div class="location-row" id="locationRow">
+        <label for="city">Konum</label>
+        <select id="city" name="city" aria-label="Ankara ilçe / konum">
+          <option value="ankara-kecioren" data-lat="39.9777" data-lon="32.8670">Ankara · Keçiören</option>
+          <option value="ankara-cankaya" data-lat="39.9208" data-lon="32.8541" selected>Ankara · Çankaya</option>
+          <option value="ankara-yenimahalle" data-lat="39.9667" data-lon="32.8111">Ankara · Yenimahalle</option>
+          <option value="ankara-mamak" data-lat="39.9200" data-lon="32.9100">Ankara · Mamak</option>
+          <option value="ankara-etimesgut" data-lat="39.9500" data-lon="32.6700">Ankara · Etimesgut</option>
+          <option value="ankara-sincan" data-lat="39.9660" data-lon="32.5800">Ankara · Sincan</option>
+          <option value="ankara-pursaklar" data-lat="40.0400" data-lon="32.9000">Ankara · Pursaklar</option>
+        </select>
+        <button type="button" class="geo-chip" id="geoBtn" title="Konumumu kullan" aria-label="Konumumu kullan">📍</button>
+      </div>
+
       <section class="hero">
         <p class="hero-brand">AGT MARKET KARŞILAŞTIRMA</p>
         <h1>Aynı ürün, çok market, canlı fiyat.</h1>

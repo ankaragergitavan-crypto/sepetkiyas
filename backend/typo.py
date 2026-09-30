@@ -322,9 +322,22 @@ def correct_query(query: str) -> dict[str, Any]:
             "note": None,
         }
 
-    parts = _TOKEN_RE.findall(original)
+    # "0,5 m su" / "0.5m su" → "0.5 L su"
+    pre = re.sub(
+        r"\b(\d+)[,.](\d+)\s*m\b",
+        r"\1.\2 L",
+        original,
+        flags=re.I,
+    )
+    pre = re.sub(r"\b(\d+)\s*m\b(?!\w)", r"\1 L", pre, flags=re.I)
+    working = pre
+    volume_fix = pre != original
+
+    parts = _TOKEN_RE.findall(working)
     out: list[str] = []
     corrections: list[dict[str, str]] = []
+    if volume_fix:
+        corrections.append({"from": original, "to": pre})
 
     for part in parts:
         if not re.fullmatch(r"[A-Za-z0-9ĞÜŞİÖÇğüşıöç]+", part):

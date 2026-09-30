@@ -155,11 +155,11 @@ main,
   margin: 0;
 }
 
-/* Tek satır: yazı | konum | 📍 | Ara */
+/* Sabit satır: sadece ürün yazısı + Ara (konum burada yok) */
 .search-panel.search-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(5.8rem, 7.2rem) 2.4rem 3.1rem;
-  gap: 0.35rem;
+  grid-template-columns: minmax(0, 1fr) 3.4rem;
+  gap: 0.4rem;
   align-items: center;
   width: 100%;
   padding: 0.35rem;
@@ -169,14 +169,13 @@ main,
   box-shadow: none;
 }
 
-.search-panel.search-row input,
-.search-panel.search-row select {
+.search-panel.search-row input {
   width: 100%;
   min-height: 2.45rem;
   height: 2.45rem;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0 0.65rem;
+  padding: 0 0.75rem;
   background: var(--bg-elev);
   color: var(--ink);
   font: inherit;
@@ -184,9 +183,8 @@ main,
   outline: none;
 }
 
-.search-panel.search-row select {
-  padding-right: 0.35rem;
-  font-size: 0.82rem;
+.search-panel.search-row input:focus {
+  border-color: rgba(125, 255, 179, 0.45);
 }
 
 .search-go {
@@ -207,9 +205,44 @@ main,
   cursor: wait;
 }
 
+/* Konum ayrı satır — kaydırınca gidebilir; arama satırı sabit kalır */
+.location-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 2.4rem;
+  gap: 0.45rem;
+  align-items: center;
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.location-row label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.location-row select {
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0 0.65rem;
+  background: var(--bg-elev);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+}
+
 .geo-chip {
-  min-height: 2.45rem;
-  height: 2.45rem;
+  min-height: 2.35rem;
+  height: 2.35rem;
   width: 2.4rem;
   padding: 0;
   border-radius: 10px;
@@ -1711,9 +1744,13 @@ a.ghost-btn.linkish {
   }
 
   .search-panel.search-row {
-    grid-template-columns: minmax(0, 1fr) minmax(5.2rem, 6.4rem) 2.2rem 2.85rem;
-    gap: 0.3rem;
+    grid-template-columns: minmax(0, 1fr) 3.2rem;
+    gap: 0.35rem;
     padding: 0.3rem;
+  }
+
+  .location-row {
+    grid-template-columns: auto minmax(0, 1fr) 2.2rem;
   }
 
   .results-head {
