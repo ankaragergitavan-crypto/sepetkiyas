@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 # Her yayınında artırın (veya Render'da APP_BUILD env ile verin)
-APP_BUILD = (os.getenv("APP_BUILD") or "29").strip()
+APP_BUILD = (os.getenv("APP_BUILD") or "30").strip()
 APP_VERSION = (os.getenv("APP_VERSION") or "1.5.1").strip()
 
 

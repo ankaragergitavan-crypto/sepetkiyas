@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=29" />
+    <link rel="manifest" href="/manifest.webmanifest?v=30" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,12 +29,12 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=29" />
+    <link rel="stylesheet" href="/static/styles.css?v=30" />
     <script>
-      window.__AGT_BUILD = "29";
+      window.__AGT_BUILD = "30";
       /* Deploy sonrası yüklü PWA otomatik güncellenir — sil/yükle gerekmez */
       (function () {
-        var LOCAL = "29";
+        var LOCAL = "30";
         function softReload(build) {
           try {
             if (sessionStorage.getItem("agt_reloaded_" + build) === "1") return;
@@ -113,7 +113,14 @@
     <div class="app-chrome" id="appChrome">
       <header class="topbar">
         <a class="brand" href="/" aria-label="AGT MARKET KARŞILAŞTIRMA ana sayfa">
-          <span class="brand-mark">AGT</span>
+          <img
+            class="brand-mark"
+            src="/static/icons/icon-192.png?v=30"
+            width="48"
+            height="48"
+            alt=""
+            decoding="async"
+          />
           <span class="brand-text">AGT MARKET KARŞILAŞTIRMA</span>
         </a>
         <div class="topbar-right">
@@ -323,7 +330,7 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=29" defer
+    <script src="/static/app.js?v=30" defer
       onload="window.__AGT_JS_OK=1"
       onerror="window.__AGT_JS_OK=0"></script>
     <script>

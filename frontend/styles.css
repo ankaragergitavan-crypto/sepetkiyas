@@ -264,19 +264,12 @@ main,
 .brand-mark {
   width: 2.4rem;
   height: 2.4rem;
-  display: grid;
-  place-items: center;
+  display: block;
   border-radius: 12px;
-  background: linear-gradient(145deg, var(--accent), #2bb673);
-  color: #062015;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  padding: 0 0.1rem;
-  overflow: hidden;
-  white-space: nowrap;
+  object-fit: cover;
+  background: #0f1a14;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
 }
 
 .brand-text {
