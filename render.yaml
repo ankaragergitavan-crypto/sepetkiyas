@@ -14,6 +14,6 @@ services:
       - key: STRICT_PRIVACY
         value: "1"
       - key: APP_BUILD
-        value: "25"
+        value: "26"
       - key: ALLOWED_IPS
         sync: false

@@ -1,6 +1,6 @@
 // Erken işaret — HTML kurtarma betiği “geç yüklendi” sanmasın
 window.__AGT_READY = false;
-window.AGT = window.AGT || { build: "25" };
+window.AGT = window.AGT || { build: "26" };
 
 const state = {
   markets: [],
@@ -369,7 +369,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=25")
+    .register("/sw.js?v=26")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -1317,23 +1317,23 @@ function renderRobot(robot) {
   `;
 }
 
-function renderOffers(payload, meta = {}) {
+function renderOffers(payload, opts = {}) {
   state.offers = mergeLocalPriceHistory(payload.offers || []);
   state.groups = payload.groups || [];
   const vol =
-    meta.volume ||
+    opts.volume ||
     payload.activeVolume ||
-    (meta.keepVolume ? state.activeVolume : null) ||
+    (opts.keepVolume ? state.activeVolume : null) ||
     "all";
   state.activeVolume = vol && vol !== "null" ? vol : "all";
   els.emptyState.hidden = true;
   els.resultsSection.hidden = false;
   els.resultsTitle.textContent = `“${payload.query}” sonuçları`;
-  let meta = `${payload.offerCount} canlı teklif · ${payload.source} · ${payload.location.distance} km · sıra: birim fiyat`;
+  let metaText = `${payload.offerCount} canlı teklif · ${payload.source} · ${payload.location.distance} km · sıra: birim fiyat`;
   if (payload.typoCorrected && payload.originalQuery && payload.originalQuery !== payload.query) {
-    meta = `“${payload.originalQuery}” → “${payload.query}” · ` + meta;
+    metaText = `“${payload.originalQuery}” → “${payload.query}” · ` + metaText;
   }
-  els.resultsMeta.textContent = meta;
+  els.resultsMeta.textContent = metaText;
 
   const pills = Object.entries(payload.byMarket || {}).map(([id, count]) => {
     const m = state.markets.find((x) => x.id === id);
@@ -2101,7 +2101,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "25",
+  build: "26",
 };
 window.__AGT_READY = true;
 hideBootBanner();
