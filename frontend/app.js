@@ -1,6 +1,6 @@
 // Erken işaret — HTML kurtarma betiği “geç yüklendi” sanmasın
 window.__AGT_READY = false;
-window.AGT = window.AGT || { build: "28" };
+window.AGT = window.AGT || { build: "29" };
 
 const state = {
   markets: [],
@@ -369,7 +369,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=28")
+    .register("/sw.js?v=29")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -2113,7 +2113,7 @@ window.AGT = {
   openCart: () => openDrawer(true),
   closeCart: () => openDrawer(false),
   unlock: () => unlockGate(),
-  build: "28",
+  build: "29",
 };
 window.__AGT_READY = true;
 hideBootBanner();

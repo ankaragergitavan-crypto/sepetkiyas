@@ -98,7 +98,7 @@ def _fuzzy_in_title(title_folded: str, token: str) -> bool:
 
 
 def _qty_patterns(tok: str) -> list[str]:
-    """'1l' / '500g' / '30' için esnek başlık/hacim kalıpları."""
+    """'1l' / '500g' / '0.5' / '30' için esnek başlık/hacim kalıpları."""
     m = re.fullmatch(r"(\d+[.,]?\d*)(kg|g|gr|ml|lt|l|cl|adet|li|lı|lu|lü)?", tok)
     if not m:
         return [re.escape(tok)]
@@ -111,18 +111,32 @@ def _qty_patterns(tok: str) -> list[str]:
     n_int = int(n) if n == int(n) else None
     n_str = str(n_int) if n_int is not None else num
     pats: list[str] = []
+    # Birimsiz ondalık (0.5) → litre + ml eşdeğeri
+    if unit == "" and "." in num and 0 < n < 20:
+        unit = "l"
     if unit in {"l", "lt"}:
         pats += (
-            [rf"\b{n_str}\s*(l|lt)\b", rf"\b{int(n * 1000)}\s*ml\b"]
+            [rf"\b{n_str}\s*(l|lt)\b", rf"\b{int(round(n * 1000))}\s*ml\b"]
             if n_int is not None
-            else [rf"\b{re.escape(num)}\s*(l|lt)\b"]
+            else [
+                rf"\b{re.escape(num)}\s*(l|lt)\b",
+                rf"\b{int(round(n * 1000))}\s*ml\b",
+                rf"\b{re.escape(num.replace('.', '[,.]'))}\s*(l|lt)\b",
+            ]
         )
+        if abs(n - 0.5) < 1e-6:
+            pats += [r"\b0[,.]5\s*(l|lt)\b", r"\b500\s*ml\b", r"\b1/2\s*(l|lt|litre)\b"]
+        if abs(n - 1.5) < 1e-6:
+            pats += [r"\b1[,.]5\s*(l|lt)\b", r"\b1500\s*ml\b"]
         if n_int == 1:
             pats.append(r"\b1000\s*ml\b")
     elif unit in {"ml"}:
         pats.append(rf"\b{n_str}\s*ml\b")
         if n_int and n_int >= 1000 and n_int % 1000 == 0:
             pats.append(rf"\b{n_int // 1000}\s*(l|lt)\b")
+        elif n_int and n_int in {250, 330, 500, 750}:
+            lit = n_int / 1000
+            pats.append(rf"\b{str(lit).replace('.', '[,.]')}\s*(l|lt)\b")
     elif unit in {"kg"}:
         pats += [rf"\b{n_str}\s*kg\b", rf"\b{int(n * 1000)}\s*g\b"] if n_int else [
             rf"\b{re.escape(num)}\s*kg\b"

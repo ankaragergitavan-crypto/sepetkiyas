@@ -322,16 +322,51 @@ def correct_query(query: str) -> dict[str, Any]:
             "note": None,
         }
 
-    # "0,5 m su" / "0.5m su" → "0.5 L su"
+    # Hacim / "0,5'lik" / yarım litre düzeltmeleri
+    pre = original
+    pre = re.sub(r"\byar[iı]m\s*(litre|lt|l\.?|şişe)?\b", "0.5 L", pre, flags=re.I)
     pre = re.sub(
-        r"\b(\d+)[,.](\d+)\s*m\b",
+        r"\b(\d+)\s*[,.]\s*(\d+)\s*[\'’]?l[iı]k\b",
         r"\1.\2 L",
-        original,
+        pre,
+        flags=re.I,
+    )
+    pre = re.sub(
+        r"\b(\d+)\s*[,.]\s*(\d+)\s*m\b",
+        r"\1.\2 L",
+        pre,
+        flags=re.I,
+    )
+    # 0,5 su / 0.5su → 0.5 L su
+    pre = re.sub(
+        r"\b(\d+)\s*[,.]\s*(\d+)\s*(?=su|süt|sut|ayran|soda|maden|içecek|icecek)\b",
+        r"\1.\2 L ",
+        pre,
+        flags=re.I,
+    )
+    pre = re.sub(
+        r"\b(\d+)\s*[,.]\s*(\d+)\s*(l|lt|litre)\b",
+        r"\1.\2 L",
+        pre,
+        flags=re.I,
+    )
+    pre = re.sub(
+        r"\b(\d+)\s*[,.]\s*(\d+)\s*(ml)\b",
+        r"\1.\2 ml",
+        pre,
+        flags=re.I,
+    )
+    # yalnız "0,5" / "0.5" (birim yok) → 0.5 L
+    pre = re.sub(
+        r"(?<![A-Za-z0-9])(\d+)\s*[,.]\s*(\d+)(?!\s*(?:kg|g|gr|ml|l|lt|litre|cl|%))",
+        r"\1.\2 L",
+        pre,
         flags=re.I,
     )
     pre = re.sub(r"\b(\d+)\s*m\b(?!\w)", r"\1 L", pre, flags=re.I)
+    pre = re.sub(r"\s+", " ", pre).strip()
     working = pre
-    volume_fix = pre != original
+    volume_fix = fold_tr(pre) != fold_tr(original)
 
     parts = _TOKEN_RE.findall(working)
     out: list[str] = []

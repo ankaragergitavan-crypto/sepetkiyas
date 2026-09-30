@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=28" />
+    <link rel="manifest" href="/manifest.webmanifest?v=29" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,12 +29,12 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=28" />
+    <link rel="stylesheet" href="/static/styles.css?v=29" />
     <script>
-      window.__AGT_BUILD = "28";
+      window.__AGT_BUILD = "29";
       /* Deploy sonrası yüklü PWA otomatik güncellenir — sil/yükle gerekmez */
       (function () {
-        var LOCAL = "28";
+        var LOCAL = "29";
         function softReload(build) {
           try {
             if (sessionStorage.getItem("agt_reloaded_" + build) === "1") return;
@@ -199,14 +199,14 @@
         <section class="list-panel" aria-label="Alışveriş listesi">
           <h2 class="list-panel-title">Alışveriş listesi tara</h2>
           <p class="muted tiny list-panel-hint">
-            En fazla 40 satır yazın, panodan yapıştırın veya liste fotoğrafı yükleyin. Her satır
-            tüm marketlerde taranır: aynı ürün (marka + kg/adet) + en ucuz → market sepeti.
-            Bulunamayanlar altta; yanında benzer, istersen ekle.
+            Alt alta şart değil — yan yana, virgül, noktalı virgül veya boşlukla yazın.
+            Örn. <em>süt, yumurta, pınar hindi salam, su 0,5</em>. Her ürün tüm marketlerde
+            marka + tür/kg önceliğiyle aranır; en uygun → sepet. Bulunamayanlarda benzer önerilir.
           </p>
           <textarea
             id="listText"
             rows="6"
-            placeholder="Örn.&#10;süt 1L&#10;yumurta 30&#10;Pınar kaşar 500g&#10;ekmek&#10;…"
+            placeholder="Örn. süt yumurta pınar hindi salam, ekmek, su 0,5 / Erikli 1.5L…"
           ></textarea>
           <div class="list-actions">
             <button type="button" class="primary-btn" id="listScanBtn">Listeyi tara ve sepetlere ekle</button>
@@ -323,7 +323,7 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=28" defer
+    <script src="/static/app.js?v=29" defer
       onload="window.__AGT_JS_OK=1"
       onerror="window.__AGT_JS_OK=0"></script>
     <script>
