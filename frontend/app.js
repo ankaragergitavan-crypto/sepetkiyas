@@ -344,7 +344,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=21")
+    .register("/sw.js?v=22")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -2036,7 +2036,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "21",
+  build: "22",
 };
 
 boot().catch((err) => {
