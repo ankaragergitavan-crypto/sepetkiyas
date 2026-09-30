@@ -1,12 +1,12 @@
 /* AGT MARKET PWA — kabuk önbellekte; deploy sonrası otomatik güncellenir */
-const BUILD = "27";
-const CACHE = "agt-market-shell-v27";
+const BUILD = "28";
+const CACHE = "agt-market-shell-v28";
 
 const SHELL = [
   "/",
-  "/static/app.js?v=27",
-  "/static/styles.css?v=27",
-  "/manifest.webmanifest?v=27",
+  "/static/app.js?v=28",
+  "/static/styles.css?v=28",
+  "/manifest.webmanifest?v=28",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/apple-touch-icon.png",
