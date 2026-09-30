@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=26" />
+    <link rel="manifest" href="/manifest.webmanifest?v=27" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,12 +29,12 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=26" />
+    <link rel="stylesheet" href="/static/styles.css?v=27" />
     <script>
-      window.__AGT_BUILD = "26";
+      window.__AGT_BUILD = "27";
       /* Deploy sonrası yüklü PWA otomatik güncellenir — sil/yükle gerekmez */
       (function () {
-        var LOCAL = "26";
+        var LOCAL = "27";
         function softReload(build) {
           try {
             if (sessionStorage.getItem("agt_reloaded_" + build) === "1") return;
@@ -323,7 +323,7 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=26" defer
+    <script src="/static/app.js?v=27" defer
       onload="window.__AGT_JS_OK=1"
       onerror="window.__AGT_JS_OK=0"></script>
     <script>
@@ -372,5 +372,90 @@
         }, 12000);
       })();
     </script>
+  
+    <script>
+      /* Acil bağlayıcı: app.js gecikse bile Ara / Sepetler / Kilidi aç çalışsın */
+      (function () {
+        function onReady(fn) {
+          if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
+          else fn();
+        }
+        onReady(function () {
+          var form = document.getElementById("searchForm");
+          if (form && !form.dataset.agtEmergency) {
+            form.dataset.agtEmergency = "1";
+            form.addEventListener("submit", function (ev) {
+              ev.preventDefault();
+              if (window.AGT && typeof window.AGT.search === "function") {
+                window.AGT.search();
+                return;
+              }
+              var qEl = document.getElementById("query");
+              var q = (qEl && qEl.value ? qEl.value : "").trim();
+              if (!q) return;
+              var city = document.getElementById("city");
+              var opt = city && city.selectedOptions && city.selectedOptions[0];
+              var lat = opt && opt.dataset.lat ? Number(opt.dataset.lat) : 39.9208;
+              var lon = opt && opt.dataset.lon ? Number(opt.dataset.lon) : 32.8541;
+              var btn = document.getElementById("searchBtn");
+              if (btn) { btn.disabled = true; btn.textContent = "Aranıyor…"; }
+              fetch("/api/search", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: q, latitude: lat, longitude: lon, distance: 12 })
+              }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (x) {
+                  if (window.AGT && window.AGT.search) { window.AGT.search(q); return; }
+                  if (!x.ok) throw new Error(x.d.detail || "Arama başarısız");
+                  var empty = document.getElementById("emptyState");
+                  var results = document.getElementById("resultsSection");
+                  var list = document.getElementById("offerList");
+                  var title = document.getElementById("resultsTitle");
+                  var meta = document.getElementById("resultsMeta");
+                  if (empty) empty.hidden = true;
+                  if (results) results.hidden = false;
+                  if (title) title.textContent = "“" + (x.d.query || q) + "” sonuçları";
+                  if (meta) meta.textContent = (x.d.offerCount || 0) + " canlı teklif";
+                  if (list) {
+                    var offers = x.d.offers || [];
+                    list.innerHTML = offers.slice(0, 50).map(function (o) {
+                      return '<article class="offer"><img class="product-thumb" src="' + (o.imageUrl || "") + '" alt="" onerror="this.style.opacity=.3"/><div><p class="offer-title">' + (o.title || "") + '</p><div class="offer-meta">' + (o.marketLabel || "") + (o.volume ? " · " + o.volume : "") + '</div></div><div class="offer-side"><div class="price">' + (o.price != null ? Number(o.price).toFixed(2) + " ₺" : "") + "</div></div></article>";
+                    }).join("") || '<p class="muted">Sonuç yok</p>';
+                  }
+                })
+                .catch(function (err) {
+                  var b = document.getElementById("bootBanner");
+                  if (b) { b.hidden = false; b.className = "boot-banner err"; b.textContent = err.message || "Arama hatası"; }
+                })
+                .finally(function () {
+                  if (btn) { btn.disabled = false; btn.textContent = "Ara"; }
+                });
+            });
+          }
+          var tab = document.getElementById("tabCart");
+          if (tab && !tab.dataset.agtEmergency) {
+            tab.dataset.agtEmergency = "1";
+            tab.addEventListener("click", function () {
+              if (window.AGT && window.AGT.openCart) window.AGT.openCart();
+              else {
+                var d = document.getElementById("cartDrawer");
+                var s = document.getElementById("scrim");
+                if (d) { d.classList.add("open"); d.setAttribute("aria-hidden", "false"); }
+                if (s) s.hidden = false;
+              }
+            });
+          }
+          var unlock = document.getElementById("gateUnlockBtn");
+          if (unlock && !unlock.dataset.agtEmergency) {
+            unlock.dataset.agtEmergency = "1";
+            unlock.addEventListener("click", function () {
+              if (window.AGT && window.AGT.unlock) window.AGT.unlock();
+            });
+          }
+        });
+      })();
+    </script>
+
   </body>
 </html>

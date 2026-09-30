@@ -1282,11 +1282,56 @@ main {
   object-fit: contain;
 }
 
-.robot-hero {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
+.robot-picks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
   margin: 0.55rem 0 0.35rem;
+}
+
+.robot-pick {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  align-content: start;
+}
+
+.robot-pick-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.robot-pick.tone-price .robot-pick-label { color: #7dffb3; }
+.robot-pick.tone-health .robot-pick-label { color: #9ecbff; }
+.robot-pick.tone-rec .robot-pick-label { color: #ffc857; }
+
+.robot-pick-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.robot-pick-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .robot-picks {
+    grid-template-columns: 1fr;
+  }
 }
 
 .td-thumb {

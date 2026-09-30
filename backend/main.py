@@ -246,7 +246,7 @@ async def search(body: SearchBody) -> dict[str, Any]:
     # Sadece Ankara konumları
     lat, lon = clamp_to_ankara(body.latitude, body.longitude)
     # CarrefourSA şubeleri biraz daha uzak olabilir — geniş tarama
-    distance = min(max(body.distance, 10), 20)
+    distance = min(max(body.distance, 12), 25)
 
     selected = body.markets
     marketfiyati_ids = [m.id for m in MARKETS if m.source == "marketfiyati"]
@@ -260,8 +260,8 @@ async def search(body: SearchBody) -> dict[str, Any]:
             longitude=lon,
             distance=distance,
             market_ids=marketfiyati_ids,
-            size=48,
-            max_pages=6,
+        size=64,
+        max_pages=10,
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Canlı fiyat alınamadı: {exc}") from exc
@@ -279,13 +279,13 @@ async def search(body: SearchBody) -> dict[str, Any]:
     filtered = [
         o
         for o in scored
-        if is_relevant(o.get("title") or "", query, min_score=3, volume=o.get("volume"))
+        if is_relevant(o.get("title") or "", query, min_score=2, volume=o.get("volume"))
     ]
     if filtered:
         result["offers"] = filtered
     elif scored:
         scored.sort(key=lambda o: (-(o.get("relevance") or 0), o.get("price") or 0))
-        result["offers"] = scored[:40]
+        result["offers"] = scored[:80]
     else:
         result["offers"] = []
 
@@ -317,7 +317,7 @@ async def search(body: SearchBody) -> dict[str, Any]:
                 if is_relevant(
                     o.get("title") or "",
                     query,
-                    min_score=3,
+                    min_score=2,
                     volume=o.get("volume"),
                 )
             ]

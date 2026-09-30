@@ -267,28 +267,44 @@ def build_robot_pick(offers: list[dict[str, Any]], query: str) -> dict[str, Any]
                 "reasons": why,
                 "whyTitle": "Neden önerildi",
                 "summary": (
-                    f"“{query}” için canlı fiyat + etiket metni tarandı. "
-                    f"Sağlık {h_score}/100, fiyat {e_score}/100. "
-                    "Laboratuvar skoru değildir; kaynak metnindeki ifadelerin özeti."
+                    f"“{query}” için tüm market canlı fiyat + etiket tarandı. "
+                    f"Sağlık {h_score}/100, fiyat {e_score}/100."
                 ),
             }
         )
 
-    ranked.sort(
+    by_price = sorted(
+        ranked,
+        key=lambda x: (
+            x["offer"].get("unitPriceEstimate")
+            if x["offer"].get("unitPriceEstimate") is not None
+            else x["offer"]["price"],
+            x["offer"]["price"],
+        ),
+    )
+    by_health = sorted(
+        ranked,
+        key=lambda x: (-int(x.get("healthScore") or 0), x["offer"]["price"]),
+    )
+    by_recommend = sorted(
+        ranked,
         key=lambda x: (
             -int(x.get("valuePick") or 0),
             -x["score"],
             x["offer"]["price"],
-        )
+        ),
     )
-    top = ranked[0]
-    alts = ranked[1:3]
+
+    top = by_recommend[0]
     return {
         "query": query,
         "pick": top,
-        "alternatives": alts,
+        "bestPrice": by_price[0],
+        "bestHealth": by_health[0],
+        "alternatives": by_recommend[1:3],
         "disclaimer": (
-            "Fiyatlar canlı. Sağlık % yalnızca başlık/marka/kategori etiket metninden; "
-            "içerik listesi API'de yok. Tıbbi tavsiye değildir."
+            "Fiyatlar canlı · tüm market tarandı. "
+            "En uygun = birim/paket fiyatı · Kaliteli = etiket sinyali · "
+            "Öneri = fiyat+kalite birleşik skor. Tıbbi tavsiye değildir."
         ),
     }

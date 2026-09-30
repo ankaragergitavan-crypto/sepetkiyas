@@ -1,6 +1,6 @@
 // Erken işaret — HTML kurtarma betiği “geç yüklendi” sanmasın
 window.__AGT_READY = false;
-window.AGT = window.AGT || { build: "26" };
+window.AGT = window.AGT || { build: "27" };
 
 const state = {
   markets: [],
@@ -369,7 +369,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=26")
+    .register("/sw.js?v=27")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -624,10 +624,11 @@ async function boot() {
 }
 
 function openDrawer(open) {
+  if (!els.cartDrawer) return;
   els.cartDrawer.classList.toggle("open", open);
   els.cartDrawer.setAttribute("aria-hidden", String(!open));
-  els.cartToggle.setAttribute("aria-expanded", String(open));
-  els.scrim.hidden = !open;
+  els.cartToggle?.setAttribute("aria-expanded", String(open));
+  if (els.scrim) els.scrim.hidden = !open;
   els.tabCart?.classList.toggle("active", open);
 }
 
@@ -1261,6 +1262,41 @@ function syncViewToggle() {
   });
 }
 
+function offerIndexOf(o) {
+  if (!o) return -1;
+  return state.offers.findIndex(
+    (x) =>
+      x.id === o.id ||
+      (x.title === o.title && x.marketId === o.marketId && x.price === o.price)
+  );
+}
+
+function robotPickCard(label, entry, tone) {
+  if (!entry?.offer) return "";
+  const o = entry.offer;
+  const idx = offerIndexOf(o);
+  return `
+    <article class="robot-pick ${tone || ""}">
+      <span class="robot-pick-label">${escapeHtml(label)}</span>
+      ${productThumbHtml(o.imageUrl, "product-thumb thumb-sm")}
+      <p class="robot-pick-title">${escapeHtml(o.title || "")}</p>
+      <p class="robot-pick-meta">
+        <span class="market-badge"><i style="background:${o.marketColor || "#999"}"></i>${escapeHtml(o.marketLabel || "")}</span>
+        <strong>${money(o.price)}</strong>
+        ${o.volume ? `<span>${escapeHtml(o.volume)}</span>` : ""}
+      </p>
+      <div class="score-bars compact robot-bars">
+        ${scoreRow("Sağlık", entry.healthScore ?? o.healthScore)}
+        ${scoreRow("Fiyat", entry.economyScore ?? o.economyScore)}
+      </div>
+      ${
+        idx >= 0
+          ? `<button type="button" class="add-btn compact robot-add" data-idx="${idx}">Sepete ekle</button>`
+          : ""
+      }
+    </article>`;
+}
+
 function renderRobot(robot) {
   if (!els.robotCard) return;
   if (!robot?.pick?.offer) {
@@ -1269,51 +1305,24 @@ function renderRobot(robot) {
     return;
   }
   const pick = robot.pick;
-  const o = pick.offer;
   const reasons = (pick.reasons || [])
+    .slice(0, 4)
     .map((r) => `<li>${escapeHtml(r)}</li>`)
     .join("");
-  const alt = (robot.alternatives || [])
-    .map(
-      (a) =>
-        `<span class="robot-alt">${escapeHtml(a.offer.marketLabel)} · ${money(a.offer.price)} · sağlık ${a.healthScore ?? "—"}%</span>`
-    )
-    .join("");
-  const idx = state.offers.findIndex(
-    (x) => x.id === o.id || (x.title === o.title && x.marketId === o.marketId && x.price === o.price)
-  );
   els.robotCard.hidden = false;
   els.robotCard.innerHTML = `
     <div class="robot-head">
-      <span class="robot-badge">Kıyas robotu · öneri</span>
-      <span class="robot-score">skor ${pick.score}</span>
+      <span class="robot-badge">Tüm marketler tarandı</span>
+      <span class="robot-score">öneri skor ${pick.score ?? "—"}</span>
     </div>
-    <div class="robot-hero">
-      ${productThumbHtml(o.imageUrl)}
-      <div>
-        <p class="robot-title">${escapeHtml(o.title)}</p>
-        <p class="robot-summary">${escapeHtml(pick.summary || "")}</p>
-      </div>
-    </div>
-    <div class="score-bars robot-bars" title="${escapeHtml(o.analysisNote || "Etiket metni taraması")}">
-      ${scoreRow("Sağlık", pick.healthScore)}
-      ${scoreRow("Fiyat", pick.economyScore)}
+    <div class="robot-picks">
+      ${robotPickCard("En uygun", robot.bestPrice || pick, "tone-price")}
+      ${robotPickCard("Kaliteli", robot.bestHealth || pick, "tone-health")}
+      ${robotPickCard("Öneri", pick, "tone-rec")}
     </div>
     <h4 class="robot-why-title">${escapeHtml(pick.whyTitle || "Neden önerildi")}</h4>
     <ul class="robot-reasons">${reasons || "<li>Gerekçe üretilemedi</li>"}</ul>
-    <div class="robot-meta">
-      <span class="market-badge"><i style="background:${o.marketColor || "#999"}"></i>${escapeHtml(o.marketLabel)}</span>
-      <strong class="robot-price">${money(o.price)}</strong>
-      ${o.volume ? `<span>${escapeHtml(o.volume)}</span>` : ""}
-      ${unitPriceLabel(o) ? `<span>${escapeHtml(unitPriceLabel(o))}</span>` : ""}
-    </div>
-    ${alt ? `<div class="robot-alts">Alternatif: ${alt}</div>` : ""}
     <p class="robot-disclaimer">${escapeHtml(robot.disclaimer || "")}</p>
-    ${
-      idx >= 0
-        ? `<button type="button" class="add-btn robot-add" data-idx="${idx}">Önerileni sepete ekle</button>`
-        : ""
-    }
   `;
 }
 
@@ -1385,10 +1394,10 @@ els.quickQueries?.addEventListener("click", (e) => {
 let lastCommittedQuery = "";
 let searchInFlight = false;
 
-els.form.addEventListener("submit", async (e) => {
+els.form?.addEventListener("submit", async (e) => {
   e.preventDefault();
   dismissKeyboard();
-  const q = els.query.value.trim();
+  const q = els.query?.value?.trim() || "";
   lastCommittedQuery = q;
   state.activeVolume = "all";
   await runSearch(q);
@@ -2101,7 +2110,10 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "26",
+  openCart: () => openDrawer(true),
+  closeCart: () => openDrawer(false),
+  unlock: () => unlockGate(),
+  build: "27",
 };
 window.__AGT_READY = true;
 hideBootBanner();

@@ -263,7 +263,7 @@ async def search_marketfiyati(
                     target,
                     origin_lat=latitude,
                     origin_lon=longitude,
-                    max_km=float(distance) + 2.0,
+                    max_km=float(distance) + 8.0,
                 )
             )
 
