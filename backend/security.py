@@ -44,6 +44,7 @@ _SECRET = (os.getenv("GATE_SECRET") or ACCESS_PIN or secrets.token_hex(16)).enco
 # Sağlık / statik / giriş dışındaki her şey kilitli (PIN varsa)
 _PUBLIC_PATHS = {
     "/api/health",
+    "/api/version",
     "/api/auth/status",
     "/api/auth/unlock",
     "/sw.js",

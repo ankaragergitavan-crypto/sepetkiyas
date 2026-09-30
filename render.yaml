@@ -13,5 +13,7 @@ services:
         value: "duman0689"
       - key: STRICT_PRIVACY
         value: "1"
+      - key: APP_BUILD
+        value: "21"
       - key: ALLOWED_IPS
         sync: false

@@ -46,6 +46,7 @@ from .security import (
     privacy_payload,
     unlock_ok,
 )
+from .build_info import APP_BUILD, APP_VERSION, build_payload
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "frontend"
@@ -98,7 +99,7 @@ class ActivityMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app = FastAPI(title="AGT MARKET KARŞILAŞTIRMA", version="1.5.0")
+app = FastAPI(title="AGT MARKET KARŞILAŞTIRMA", version=APP_VERSION)
 
 # Dışarıya açık CORS yok — sadece kendi origin (veya ALLOWED_ORIGINS)
 _cors = cors_origins_for_starlette()
@@ -173,7 +174,14 @@ async def health() -> dict[str, Any]:
         "platforms": ["web", "android", "ios", "desktop"],
         "getir": "carsi_live_optional_reef",
         "timer": timer_payload(),
+        **build_payload(),
     }
+
+
+@app.get("/api/version")
+async def version() -> dict[str, Any]:
+    """Yüklü PWA otomatik güncelleme kontrolü (şifresiz)."""
+    return build_payload()
 
 
 @app.get("/api/timer")

@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=20" />
+    <link rel="manifest" href="/manifest.webmanifest?v=21" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,31 +29,38 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20" />
+    <link rel="stylesheet" href="/static/styles.css?v=21" />
     <script>
-      window.__AGT_BUILD = "20";
-      /* Yüklü PWA'da eski cache / bozuk SW uygulamayı öldürüyordu */
+      window.__AGT_BUILD = "21";
+      /* Deploy sonrası yüklü PWA otomatik güncellenir — sil/yükle gerekmez */
       (function () {
-        var BUILD = "20";
-        function wipeThenReload() {
+        var LOCAL = "21";
+        function softReload(build) {
+          try {
+            if (sessionStorage.getItem("agt_reloaded_" + build) === "1") return;
+            sessionStorage.setItem("agt_reloaded_" + build, "1");
+          } catch (e) {}
+          var u = new URL(location.href);
+          u.searchParams.set("v", build);
+          location.replace(u.toString());
+        }
+        function clearCaches() {
           var tasks = [];
+          if ("caches" in window) {
+            tasks.push(
+              caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              })
+            );
+          }
           if ("serviceWorker" in navigator) {
             tasks.push(
               navigator.serviceWorker.getRegistrations().then(function (rs) {
                 return Promise.all(
                   rs.map(function (r) {
-                    return r.unregister();
-                  })
-                );
-              })
-            );
-          }
-          if ("caches" in window) {
-            tasks.push(
-              caches.keys().then(function (ks) {
-                return Promise.all(
-                  ks.map(function (k) {
-                    return caches.delete(k);
+                    return r.update().then(function () {
+                      if (r.waiting) r.waiting.postMessage("SKIP_WAITING");
+                    }).catch(function () {});
                   })
                 );
               })
@@ -61,19 +68,28 @@
           }
           return Promise.all(tasks).catch(function () {});
         }
-        try {
-          var key = "agt_build";
-          if (localStorage.getItem(key) !== BUILD) {
-            localStorage.setItem(key, BUILD);
-            wipeThenReload().then(function () {
-              var u = new URL(location.href);
-              if (u.searchParams.get("v") === BUILD) return;
-              u.searchParams.set("v", BUILD);
-              u.searchParams.set("source", "pwa");
-              location.replace(u.toString());
-            });
-          }
-        } catch (e) {}
+        function checkServerBuild() {
+          fetch("/api/version", { cache: "no-store", credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var remote = String((data && data.build) || "");
+              if (!remote) return;
+              var stored = null;
+              try { stored = localStorage.getItem("agt_build"); } catch (e) {}
+              if (remote !== LOCAL || (stored && stored !== remote)) {
+                try { localStorage.setItem("agt_build", remote); } catch (e) {}
+                clearCaches().then(function () { softReload(remote); });
+              } else {
+                try { localStorage.setItem("agt_build", remote); } catch (e) {}
+              }
+            })
+            .catch(function () {});
+        }
+        checkServerBuild();
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") checkServerBuild();
+        });
+        setInterval(checkServerBuild, 60000);
       })();
     </script>
   </head>
@@ -94,26 +110,56 @@
     <div class="bg-grid" aria-hidden="true"></div>
     <div class="bg-glow" aria-hidden="true"></div>
 
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="AGT MARKET KARŞILAŞTIRMA ana sayfa">
-        <span class="brand-mark">AGT</span>
-        <span class="brand-text">AGT MARKET KARŞILAŞTIRMA</span>
-      </a>
-      <div class="topbar-right">
-        <div
-          class="live-timer"
-          id="liveTimer"
-          title="Ücretsiz planda ayda 750 saat. Her ayın 1'inde yenilenir."
-        >
-          <span class="live-timer-label">Kalan</span>
-          <span class="live-timer-value" id="liveTimerValue">750 saat</span>
+    <div class="app-chrome" id="appChrome">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="AGT MARKET KARŞILAŞTIRMA ana sayfa">
+          <span class="brand-mark">AGT</span>
+          <span class="brand-text">AGT MARKET KARŞILAŞTIRMA</span>
+        </a>
+        <div class="topbar-right">
+          <div
+            class="live-timer"
+            id="liveTimer"
+            title="Ücretsiz planda ayda 750 saat. Her ayın 1'inde yenilenir."
+          >
+            <span class="live-timer-label">Kalan</span>
+            <span class="live-timer-value" id="liveTimerValue">750 saat</span>
+          </div>
+          <button type="button" class="cart-toggle" id="cartToggle" aria-expanded="false">
+            Sepetler
+            <span class="cart-badge" id="cartBadge">0</span>
+          </button>
         </div>
-        <button type="button" class="cart-toggle" id="cartToggle" aria-expanded="false">
-          Sepetler
-          <span class="cart-badge" id="cartBadge">0</span>
-        </button>
+      </header>
+
+      <div class="search-dock" id="searchDock">
+        <form class="search-panel search-row" id="searchForm">
+          <label class="sr-only" for="query">Ürün adı</label>
+          <input
+            id="query"
+            name="query"
+            type="search"
+            enterkeyhint="search"
+            inputmode="search"
+            placeholder="Ürün ara…"
+            autocomplete="off"
+            required
+          />
+          <label class="sr-only" for="city">Ankara ilçe</label>
+          <select id="city" name="city" aria-label="Ankara ilçe / konum">
+            <option value="ankara-kecioren" data-lat="39.9777" data-lon="32.8670">Keçiören</option>
+            <option value="ankara-cankaya" data-lat="39.9208" data-lon="32.8541" selected>Çankaya</option>
+            <option value="ankara-yenimahalle" data-lat="39.9667" data-lon="32.8111">Yenimahalle</option>
+            <option value="ankara-mamak" data-lat="39.9200" data-lon="32.9100">Mamak</option>
+            <option value="ankara-etimesgut" data-lat="39.9500" data-lon="32.6700">Etimesgut</option>
+            <option value="ankara-sincan" data-lat="39.9660" data-lon="32.5800">Sincan</option>
+            <option value="ankara-pursaklar" data-lat="40.0400" data-lon="32.9000">Pursaklar</option>
+          </select>
+          <button type="button" class="geo-chip" id="geoBtn" title="Konumumu kullan" aria-label="Konumumu kullan">📍</button>
+          <button type="submit" class="search-go" id="searchBtn" aria-label="Ara ve karşılaştır">Ara</button>
+        </form>
       </div>
-    </header>
+    </div>
 
     <main>
       <div id="bootBanner" class="boot-banner" hidden></div>
@@ -125,34 +171,6 @@
           <strong>Ankara</strong>). Yazarak veya <strong>foto / galeri</strong> ile ürün tara;
           en ucuzdan pahalıya sırala, her market için ayrı sepet tut.
         </p>
-
-        <form class="search-panel" id="searchForm">
-          <label class="sr-only" for="query">Ürün adı</label>
-          <input
-            id="query"
-            name="query"
-            type="search"
-            enterkeyhint="search"
-            inputmode="search"
-            placeholder="Örn. süt, yumurta, kaşar 500 g…"
-            autocomplete="off"
-            required
-          />
-          <div class="city-field">
-            <label for="city">Ankara ilçe</label>
-            <select id="city" name="city" aria-label="Ankara ilçe seçin">
-              <option value="ankara-kecioren" data-lat="39.9777" data-lon="32.8670">Ankara · Keçiören</option>
-              <option value="ankara-cankaya" data-lat="39.9208" data-lon="32.8541" selected>Ankara · Çankaya</option>
-              <option value="ankara-yenimahalle" data-lat="39.9667" data-lon="32.8111">Ankara · Yenimahalle</option>
-              <option value="ankara-mamak" data-lat="39.9200" data-lon="32.9100">Ankara · Mamak</option>
-              <option value="ankara-etimesgut" data-lat="39.9500" data-lon="32.6700">Ankara · Etimesgut</option>
-              <option value="ankara-sincan" data-lat="39.9660" data-lon="32.5800">Ankara · Sincan</option>
-              <option value="ankara-pursaklar" data-lat="40.0400" data-lon="32.9000">Ankara · Pursaklar</option>
-            </select>
-            <button type="button" class="ghost-btn tiny-btn" id="geoBtn">Konumumu kullan</button>
-          </div>
-          <button type="submit" id="searchBtn">Ara / Karşılaştır</button>
-        </form>
 
         <div class="scan-tools" aria-label="Görüntü ile ara">
           <label class="scan-btn file-btn" for="scanFileInput">Kamera ile ürün tara</label>
@@ -304,7 +322,7 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=20" defer></script>
+    <script src="/static/app.js?v=21" defer></script>
     <script>
       /* app.js yüklenmezse bile arama çalışsın (yüklü PWA kurtarma) */
       (function () {

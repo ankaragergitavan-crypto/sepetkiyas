@@ -1,6 +1,6 @@
-/* AGT MARKET PWA — v19: yüklü uygulamada taze JS/CSS, API ağdan */
-const CACHE = "agt-market-shell-v20";
-const BUILD = "20";
+/* AGT MARKET PWA — yüklü cihazlar deploy sonrası otomatik güncellenir */
+const CACHE = "agt-market-shell-v21";
+const BUILD = "21";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -17,7 +17,10 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
+  const data = event.data;
+  if (data === "SKIP_WAITING" || (data && data.type === "SKIP_WAITING")) {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -32,7 +35,6 @@ self.addEventListener("fetch", (event) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  // API daima ağ — Render uyandırma için cache yok
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(

@@ -336,20 +336,28 @@ function dismissKeyboard() {
 
 function registerPwa() {
   if (!("serviceWorker" in navigator)) return;
+
+  const bumpSw = (reg) => {
+    if (!reg) return;
+    reg.update().catch(() => {});
+    if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+  };
+
   navigator.serviceWorker
-    .register("/sw.js?v=20")
+    .register("/sw.js?v=21")
     .then((reg) => {
-      reg.update().catch(() => {});
-      if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+      bumpSw(reg);
       reg.addEventListener("updatefound", () => {
         const sw = reg.installing;
         if (!sw) return;
         sw.addEventListener("statechange", () => {
-          if (sw.state === "installed" && navigator.serviceWorker.controller) {
+          if (sw.state === "installed") {
             sw.postMessage("SKIP_WAITING");
           }
         });
       });
+      // Periyodik güncelleme — Manual Deploy sonrası yüklü telefonlar
+      setInterval(() => bumpSw(reg), 45000);
     })
     .catch(() => {});
 
@@ -357,9 +365,55 @@ function registerPwa() {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshing) return;
     refreshing = true;
-    // Yüklü PWA yeni SW alınca bir kez yenile
     location.reload();
   });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    navigator.serviceWorker.getRegistration().then(bumpSw).catch(() => {});
+    ensureLatestFromServer();
+  });
+
+  window.addEventListener("focus", () => {
+    navigator.serviceWorker.getRegistration().then(bumpSw).catch(() => {});
+    ensureLatestFromServer();
+  });
+
+  ensureLatestFromServer();
+  setInterval(ensureLatestFromServer, 60000);
+}
+
+async function ensureLatestFromServer() {
+  try {
+    const res = await fetch("/api/version", { cache: "no-store", credentials: "same-origin" });
+    if (!res.ok) return;
+    const data = await res.json();
+    const remote = String(data.build || "");
+    if (!remote) return;
+    const local = String(window.__AGT_BUILD || "");
+    const stored = localStorage.getItem("agt_build");
+    localStorage.setItem("agt_build", remote);
+    if (remote === local && (!stored || stored === remote)) return;
+
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+      regs.map(async (r) => {
+        await r.update().catch(() => {});
+        if (r.waiting) r.waiting.postMessage("SKIP_WAITING");
+      })
+    );
+    if (caches?.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if (sessionStorage.getItem("agt_reloaded_" + remote) === "1") return;
+    sessionStorage.setItem("agt_reloaded_" + remote, "1");
+    const u = new URL(location.href);
+    u.searchParams.set("v", remote);
+    location.replace(u.toString());
+  } catch {
+    /* ignore */
+  }
 }
 
 async function wakeServer() {
@@ -460,7 +514,8 @@ async function boot() {
   await wakeServer();
 
   if (new URLSearchParams(location.search).get("focus") === "search") {
-    els.query?.focus();
+    // Odaklama yok — sadece üst arama paneli görünsün
+    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
   }
 
   try {
@@ -588,6 +643,10 @@ function fitViewportToScreen() {
     "--gutter-safe",
     `max(${getComputedStyle(document.documentElement).getPropertyValue("--gutter").trim() || "0.75rem"}, env(safe-area-inset-left), env(safe-area-inset-right))`
   );
+  const chrome = document.getElementById("appChrome");
+  if (chrome) {
+    document.documentElement.style.setProperty("--chrome-h", `${chrome.offsetHeight}px`);
+  }
 }
 
 function renderCarts() {
@@ -1289,8 +1348,13 @@ async function runSearch(rawQuery, meta = {}) {
     else if (data.typoNote) setScanStatus(data.typoNote, false);
     else setScanStatus("", true);
     dismissKeyboard();
-    const top = els.resultsSection?.offsetTop ?? 0;
-    window.scrollTo({ top: Math.max(0, top - 12), behavior: "smooth" });
+    const el = els.resultsSection;
+    if (el && !el.hidden) {
+      const y = el.getBoundingClientRect().top + window.scrollY;
+      const offset = document.getElementById("appChrome")?.offsetHeight ?? 0;
+      window.scrollTo({ top: Math.max(0, y - offset - 6), behavior: "smooth" });
+    }
+    fitViewportToScreen();
   } catch (err) {
     els.emptyState.hidden = false;
     els.resultsSection.hidden = true;
@@ -1298,7 +1362,7 @@ async function runSearch(rawQuery, meta = {}) {
     setScanStatus(err.message || "Arama hatası", false);
   } finally {
     els.searchBtn.disabled = false;
-    els.searchBtn.textContent = "Ara / Karşılaştır";
+    els.searchBtn.textContent = "Ara";
     dismissKeyboard();
     syncTimer();
   }
@@ -1881,7 +1945,15 @@ els.closeCart?.addEventListener("click", () => openDrawer(false));
 els.scrim?.addEventListener("click", () => openDrawer(false));
 els.tabSearch?.addEventListener("click", () => {
   openDrawer(false);
-  els.query?.focus();
+  dismissKeyboard();
+  const q = (els.query?.value || "").trim();
+  if (q) {
+    // Alt menü Ara = Ara / Karşılaştır (yazma yerine odaklanmaz)
+    runSearch(q);
+    return;
+  }
+  // Boşsa sadece üst sabit arama paneline kaydır — input’a focus yok
+  document.getElementById("searchDock")?.scrollIntoView({ behavior: "smooth", block: "start" });
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 els.tabCart?.addEventListener("click", () => openDrawer(true));
@@ -1912,7 +1984,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "20",
+  build: "21",
 };
 
 boot().catch((err) => {
