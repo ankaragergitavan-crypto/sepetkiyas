@@ -19,7 +19,7 @@
     <meta name="apple-mobile-web-app-title" content="AGT MARKET KARŞILAŞTIRMA" />
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="manifest" href="/manifest.webmanifest?v=23" />
+    <link rel="manifest" href="/manifest.webmanifest?v=25" />
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
     <title>AGT MARKET KARŞILAŞTIRMA</title>
@@ -29,12 +29,12 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=23" />
+    <link rel="stylesheet" href="/static/styles.css?v=25" />
     <script>
-      window.__AGT_BUILD = "23";
+      window.__AGT_BUILD = "25";
       /* Deploy sonrası yüklü PWA otomatik güncellenir — sil/yükle gerekmez */
       (function () {
-        var LOCAL = "23";
+        var LOCAL = "25";
         function softReload(build) {
           try {
             if (sessionStorage.getItem("agt_reloaded_" + build) === "1") return;
@@ -267,10 +267,7 @@
     </main>
 
     <nav class="tabbar" aria-label="Alt menü">
-      <button type="button" class="tab active" data-tab="search" id="tabSearch">
-        <span>Ara</span>
-      </button>
-      <button type="button" class="tab" data-tab="cart" id="tabCart">
+      <button type="button" class="tab tab-cart-full" data-tab="cart" id="tabCart" aria-label="Sepetler">
         <span>Sepetler</span>
         <span class="tab-badge" id="tabCartBadge">0</span>
       </button>
@@ -326,153 +323,53 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=23" defer></script>
+    <script src="/static/app.js?v=25" defer
+      onload="window.__AGT_JS_OK=1"
+      onerror="window.__AGT_JS_OK=0"></script>
     <script>
-      /* app.js yüklenmezse bile arama çalışsın (yüklü PWA kurtarma) */
       (function () {
-        function showBanner(msg, isErr) {
+        function hideBanner() {
+          var b = document.getElementById("bootBanner");
+          if (!b) return;
+          b.hidden = true;
+          b.textContent = "";
+          b.className = "boot-banner";
+        }
+        function showConnecting() {
+          if (window.__AGT_READY || window.__AGT_JS_OK === 1) return;
           var b = document.getElementById("bootBanner");
           if (!b) return;
           b.hidden = false;
-          b.className = "boot-banner" + (isErr ? " err" : "");
+          b.className = "boot-banner";
+          b.textContent = "Bağlanıyor…";
+        }
+        function showReloadOnce() {
+          if (window.__AGT_READY || window.__AGT_JS_OK === 1 || (window.AGT && window.AGT.search)) return;
+          var b = document.getElementById("bootBanner");
+          if (!b) return;
+          b.hidden = false;
+          b.className = "boot-banner err";
           b.innerHTML =
-            msg +
-            ' <button type="button" id="bootReloadBtn" class="ghost-btn tiny-btn">Yenile</button>';
+            'Uygulama yüklenemedi. <button type="button" id="bootReloadBtn" class="ghost-btn tiny-btn">Yenile</button>';
           var btn = document.getElementById("bootReloadBtn");
           if (btn) {
             btn.onclick = function () {
-              try {
-                localStorage.removeItem("agt_build");
-              } catch (e) {}
+              try { localStorage.removeItem("agt_build"); } catch (e) {}
               location.reload();
             };
           }
         }
-
-        function cityLatLon() {
-          var sel = document.getElementById("city");
-          var opt = sel && sel.selectedOptions && sel.selectedOptions[0];
-          if (opt && opt.dataset.lat && opt.dataset.lon) {
-            return { lat: Number(opt.dataset.lat), lon: Number(opt.dataset.lon) };
-          }
-          return { lat: 39.9208, lon: 32.8541 };
-        }
-
-        async function wakeServer() {
-          try {
-            showBanner("Sunucu kontrol ediliyor…", false);
-            var ctrl = new AbortController();
-            var t = setTimeout(function () {
-              ctrl.abort();
-            }, 45000);
-            var res = await fetch("/api/health", { cache: "no-store", credentials: "same-origin", signal: ctrl.signal });
-            clearTimeout(t);
-            if (!res.ok) throw new Error("Sunucu yanıt vermedi");
-            var b = document.getElementById("bootBanner");
-            if (b) b.hidden = true;
-            return true;
-          } catch (e) {
-            showBanner(
-              "Sunucu uyanmıyor (ücretsiz plan uyuyabilir). İnternet açıkken Yenile’ye basın.",
-              true
-            );
-            return false;
-          }
-        }
-
-        async function rescueSearch(ev) {
-          if (ev) ev.preventDefault();
-          if (window.AGT && typeof window.AGT.search === "function") {
-            window.AGT.search();
+        var slow = setTimeout(showConnecting, 3000);
+        fetch("/api/health", { cache: "no-store", credentials: "same-origin" })
+          .then(function () { clearTimeout(slow); if (!window.__AGT_READY) hideBanner(); })
+          .catch(function () { clearTimeout(slow); });
+        setTimeout(function () {
+          if (window.__AGT_READY || window.__AGT_JS_OK === 1 || (window.AGT && window.AGT.search)) {
+            hideBanner();
             return;
           }
-          var qEl = document.getElementById("query");
-          var btn = document.getElementById("searchBtn");
-          var q = (qEl && qEl.value ? qEl.value : "").trim();
-          if (!q) return;
-          var city = cityLatLon();
-          if (btn) {
-            btn.disabled = true;
-            btn.textContent = "Aranıyor…";
-          }
-          showBanner("Aranıyor: " + q, false);
-          try {
-            await wakeServer();
-            var res = await fetch("/api/search", {
-              method: "POST",
-              credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                query: q,
-                latitude: city.lat,
-                longitude: city.lon,
-                distance: 12,
-              }),
-            });
-            var data = await res.json();
-            if (!res.ok) throw new Error(data.detail || "Arama başarısız");
-            if (window.AGT && window.AGT.search) {
-              window.AGT.search(q);
-            } else {
-              // Minimal sonuç göster
-              var empty = document.getElementById("emptyState");
-              var results = document.getElementById("resultsSection");
-              var list = document.getElementById("offerList");
-              var title = document.getElementById("resultsTitle");
-              var meta = document.getElementById("resultsMeta");
-              if (empty) empty.hidden = true;
-              if (results) results.hidden = false;
-              if (title) title.textContent = "“" + (data.query || q) + "” sonuçları";
-              if (meta)
-                meta.textContent =
-                  (data.offerCount || 0) + " canlı teklif · " + (data.source || "");
-              if (list) {
-                var offers = data.offers || [];
-                list.innerHTML = offers.length
-                  ? offers
-                      .slice(0, 40)
-                      .map(function (o) {
-                        return (
-                          '<article class="offer"><div><strong>' +
-                          (o.title || "") +
-                          "</strong><div class=\"muted tiny\">" +
-                          (o.marketLabel || "") +
-                          (o.volume ? " · " + o.volume : "") +
-                          '</div></div><div class="offer-side"><strong>' +
-                          Number(o.price || 0).toFixed(2) +
-                          " ₺</strong></div></article>"
-                        );
-                      })
-                      .join("")
-                  : '<p class="muted">Bu konumda teklif yok.</p>';
-              }
-              showBanner("Sonuçlar geldi. Tam özellik için Yenile’ye basın.", false);
-            }
-          } catch (err) {
-            showBanner(err.message || "Arama hatası", true);
-          } finally {
-            if (btn) {
-              btn.disabled = false;
-              btn.textContent = "Ara / Karşılaştır";
-            }
-          }
-        }
-
-        document.addEventListener("DOMContentLoaded", function () {
-          var form = document.getElementById("searchForm");
-          if (form) {
-            form.addEventListener("submit", rescueSearch);
-          }
-          wakeServer();
-          setTimeout(function () {
-            if (!window.AGT) {
-              showBanner(
-                "Uygulama dosyası geç yüklendi. Arama yine de çalışır — veya Yenile’ye basın.",
-                true
-              );
-            }
-          }, 4000);
-        });
+          showReloadOnce();
+        }, 12000);
       })();
     </script>
   </body>

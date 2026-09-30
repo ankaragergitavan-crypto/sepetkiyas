@@ -1,17 +1,34 @@
-/* AGT MARKET PWA — yüklü cihazlar deploy sonrası otomatik güncellenir */
-const CACHE = "agt-market-shell-v23";
-const BUILD = "23";
+/* AGT MARKET PWA — kabuk önbellekte; deploy sonrası otomatik güncellenir */
+const BUILD = "25";
+const CACHE = "agt-market-shell-v25";
+
+const SHELL = [
+  "/",
+  "/static/app.js?v=25",
+  "/static/styles.css?v=25",
+  "/manifest.webmanifest?v=25",
+  "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
+  "/static/icons/apple-touch-icon.png",
+  "/static/icons/icon-maskable-512.png",
+];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then(() => undefined));
+  event.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      Promise.all(SHELL.map((url) => cache.add(url).catch(() => undefined)))
+    )
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -22,6 +39,36 @@ self.addEventListener("message", (event) => {
     self.skipWaiting();
   }
 });
+
+function isShellPath(pathname) {
+  return (
+    pathname === "/" ||
+    pathname.endsWith(".html") ||
+    pathname.endsWith(".js") ||
+    pathname.endsWith(".css") ||
+    pathname === "/sw.js" ||
+    pathname.endsWith("manifest.webmanifest") ||
+    pathname.startsWith("/static/icons/")
+  );
+}
+
+async function staleWhileRevalidate(req) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(req);
+  const network = fetch(req, { cache: "no-store" })
+    .then((res) => {
+      if (res && res.ok) {
+        cache.put(req, res.clone()).catch(() => {});
+      }
+      return res;
+    })
+    .catch(() => cached);
+  if (cached) {
+    network.catch(() => {});
+    return cached;
+  }
+  return network;
+}
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
@@ -51,18 +98,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const critical =
-    url.pathname === "/" ||
-    url.pathname.endsWith(".html") ||
-    url.pathname.endsWith(".js") ||
-    url.pathname.endsWith(".css") ||
-    url.pathname === "/sw.js" ||
-    url.pathname.endsWith("manifest.webmanifest");
-
-  if (critical) {
-    event.respondWith(
-      fetch(req, { cache: "no-store" }).catch(() => caches.match(req))
-    );
+  if (isShellPath(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(req));
     return;
   }
 

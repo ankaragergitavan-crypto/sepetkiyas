@@ -1255,12 +1255,63 @@ main {
   transform: translateY(-1px);
 }
 
-.offer img {
+.offer img,
+.product-thumb {
   width: 72px;
   height: 72px;
   object-fit: contain;
   border-radius: 12px;
   background: #0b140f;
+  flex-shrink: 0;
+  display: block;
+}
+
+.product-thumb.thumb-sm {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+}
+
+.product-thumb.thumb-lg {
+  width: 112px;
+  height: 112px;
+  border-radius: 16px;
+}
+
+.product-thumb.is-placeholder {
+  object-fit: contain;
+}
+
+.robot-hero {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.55rem 0 0.35rem;
+}
+
+.td-thumb {
+  width: 52px;
+  vertical-align: middle;
+}
+
+.group-row {
+  display: grid;
+  grid-template-columns: 44px 7rem minmax(0, 1fr) auto auto minmax(6.5rem, 8.5rem) auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 0.4rem 0.7rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  align-items: start;
 }
 
 .offer-title {
@@ -1685,7 +1736,7 @@ a.ghost-btn.linkish {
   bottom: 0;
   z-index: 15;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 0.35rem;
   padding: 0.45rem 0.75rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
   background: rgba(12, 20, 16, 0.94);
@@ -1702,22 +1753,31 @@ a.ghost-btn.linkish {
   font-weight: 650;
 }
 
+.tab.tab-cart-full {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: #062015;
+  background: linear-gradient(135deg, var(--accent), #3fd98a);
+  font-weight: 800;
+}
+
 .tab.active {
   color: #062015;
   background: linear-gradient(135deg, var(--accent), #3fd98a);
 }
 
 .tab-badge {
-  position: absolute;
-  top: 0.35rem;
-  right: calc(50% - 2.4rem);
-  min-width: 1.15rem;
-  height: 1.15rem;
-  padding: 0 0.3rem;
+  position: static;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
   border-radius: 999px;
-  background: var(--accent-2);
-  color: #1a1200;
-  font-size: 0.68rem;
+  background: #062015;
+  color: var(--accent);
+  font-size: 0.72rem;
   font-weight: 800;
   display: inline-grid;
   place-items: center;

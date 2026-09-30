@@ -1,3 +1,7 @@
+// Erken işaret — HTML kurtarma betiği “geç yüklendi” sanmasın
+window.__AGT_READY = false;
+window.AGT = window.AGT || { build: "25" };
+
 const state = {
   markets: [],
   cities: [],
@@ -64,7 +68,6 @@ const els = {
   geoBtn: document.getElementById("geoBtn"),
   desktopBtn: document.getElementById("desktopBtn"),
   desktopMsg: document.getElementById("desktopMsg"),
-  tabSearch: document.getElementById("tabSearch"),
   tabCart: document.getElementById("tabCart"),
   liveTimer: document.getElementById("liveTimer"),
   liveTimerValue: document.getElementById("liveTimerValue"),
@@ -282,12 +285,31 @@ function pickCityByCoords(lat, lon) {
   return best;
 }
 
-function applyCitySelection(city, note) {
+function saveSelectedCity(cityId) {
+  const id = String(cityId || "").trim();
+  if (!id) return;
+  try {
+    localStorage.setItem("agt_city", id);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadSavedCityId() {
+  try {
+    return localStorage.getItem("agt_city");
+  } catch {
+    return null;
+  }
+}
+
+function applyCitySelection(city, note, { persist = true, emitChange = true } = {}) {
   if (!city || !els.city) return false;
   const exists = [...els.city.options].some((o) => o.value === city.id);
   if (!exists) return false;
   els.city.value = city.id;
-  els.city.dispatchEvent(new Event("change", { bubbles: true }));
+  if (persist) saveSelectedCity(city.id);
+  if (emitChange) els.city.dispatchEvent(new Event("change", { bubbles: true }));
   if (note) setScanStatus(note, false);
   return true;
 }
@@ -302,7 +324,10 @@ function autoSelectByGeolocation(interactive = false) {
     (pos) => {
       const city = pickCityByCoords(pos.coords.latitude, pos.coords.longitude);
       if (city) {
-        applyCitySelection(city, `Konum algılandı: ${city.label}`);
+        applyCitySelection(city, `Konum algılandı: ${city.label}`, {
+          persist: true,
+          emitChange: true,
+        });
       } else if (interactive) {
         setScanStatus("Konum Ankara dışında — ilçeyi elle seçin.", false);
       }
@@ -344,7 +369,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=23")
+    .register("/sw.js?v=25")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -416,25 +441,44 @@ async function ensureLatestFromServer() {
   }
 }
 
+function hideBootBanner() {
+  const banner = document.getElementById("bootBanner");
+  if (!banner) return;
+  banner.hidden = true;
+  banner.textContent = "";
+  banner.className = "boot-banner";
+}
+
 async function wakeServer() {
   const banner = document.getElementById("bootBanner");
-  const show = (msg, isErr) => {
-    if (!banner) return;
-    banner.hidden = false;
-    banner.className = "boot-banner" + (isErr ? " err" : "");
-    banner.textContent = msg;
-  };
+  let slowTimer = null;
   try {
-    show("Sunucu uyanıyor… (ilk açılış 30 sn sürebilir)");
+    // Hemen uyarı yok — yalnızca gerçekten yavaşsa “Bağlanıyor…”
+    slowTimer = setTimeout(() => {
+      if (!banner || window.__AGT_READY) return;
+      banner.hidden = false;
+      banner.className = "boot-banner";
+      banner.textContent = "Bağlanıyor…";
+    }, 2800);
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 60000);
     const res = await apiFetch("/api/health", { cache: "no-store", signal: ctrl.signal });
     clearTimeout(t);
+    clearTimeout(slowTimer);
     if (!res.ok) throw new Error("health");
-    banner.hidden = true;
+    hideBootBanner();
     return true;
   } catch {
-    show("Sunucu yanıt vermiyor. İnterneti kontrol edip Yenile’ye basın.", true);
+    clearTimeout(slowTimer);
+    if (banner) {
+      banner.hidden = false;
+      banner.className = "boot-banner err";
+      banner.innerHTML =
+        'Bağlantı yok. İnterneti kontrol edin. <button type="button" id="bootReloadBtn" class="ghost-btn tiny-btn">Yenile</button>';
+      document.getElementById("bootReloadBtn")?.addEventListener("click", () => {
+        location.reload();
+      });
+    }
     return false;
   }
 }
@@ -547,20 +591,22 @@ async function boot() {
   }
 
   if (els.city && (state.cities || []).length) {
-    const prev = els.city.value || "ankara-cankaya";
+    const saved = loadSavedCityId();
+    const prev = saved || els.city.value || "ankara-cankaya";
     els.city.innerHTML = state.cities
       .map(
         (c) =>
           `<option value="${c.id}" data-lat="${c.lat}" data-lon="${c.lon}">${escapeHtml(c.label)}</option>`
       )
       .join("");
-    if ([...els.city.options].some((o) => o.value === prev)) els.city.value = prev;
+    if ([...els.city.options].some((o) => o.value === prev)) {
+      els.city.value = prev;
+      saveSelectedCity(prev);
+    }
   }
 
-  // Telefon konumu açıksa en yakın Ankara ilçesini seç
-  autoSelectByGeolocation(false);
+  // GPS yalnızca 📍 butonuna basınca — açılışta kaydedilmiş ilçe kalsın
   els.geoBtn?.addEventListener("click", () => autoSelectByGeolocation(true));
-
   if (els.chips) {
     els.chips.innerHTML = (state.markets || [])
       .map(
@@ -582,8 +628,7 @@ function openDrawer(open) {
   els.cartDrawer.setAttribute("aria-hidden", String(!open));
   els.cartToggle.setAttribute("aria-expanded", String(open));
   els.scrim.hidden = !open;
-  els.tabSearch.classList.toggle("active", !open);
-  els.tabCart.classList.toggle("active", open);
+  els.tabCart?.classList.toggle("active", open);
 }
 
 function addToCart(offer, meta = {}) {
@@ -727,6 +772,7 @@ function renderCarts() {
             .map(
               (item) => `
             <div class="cart-item">
+              ${productThumbHtml(item.imageUrl, "product-thumb thumb-sm")}
               <div>
                 <div>${escapeHtml(item.title)}</div>
                 <div class="muted tiny">${money(item.price)} × ${item.qty}${item.volume ? ` · ${escapeHtml(item.volume)}` : ""}</div>
@@ -764,6 +810,29 @@ function escapeHtml(str) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+window.__AGT_PLACEHOLDER =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="14" fill="#0b140f"/><text x="48" y="55" text-anchor="middle" fill="#5cff9a" font-family="Arial,sans-serif" font-size="22" font-weight="800">AGT</text></svg>'
+  );
+
+function normalizeImageUrl(url) {
+  let u = String(url || "").trim();
+  if (!u) return "";
+  if (u.startsWith("//")) u = `https:${u}`;
+  if (u.startsWith("http://")) u = `https://${u.slice(7)}`;
+  return u;
+}
+
+function productThumbHtml(url, cls = "product-thumb") {
+  const src = normalizeImageUrl(url);
+  const ph = window.__AGT_PLACEHOLDER;
+  if (!src) {
+    return `<img class="${cls} is-placeholder" src="${ph}" alt="" width="72" height="72" decoding="async" />`;
+  }
+  return `<img class="${cls}" src="${escapeHtml(src)}" alt="" width="72" height="72" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.classList.add('is-placeholder');this.src=window.__AGT_PLACEHOLDER" />`;
 }
 
 function renderVolumeChips(options) {
@@ -843,11 +912,7 @@ async function showProductContent(offer) {
   const cats = (offer.categories || []).map((c) => escapeHtml(String(c))).join(", ");
   els.productModalBody.innerHTML = `
     <div class="product-detail-hero">
-      ${
-        offer.imageUrl
-          ? `<img src="${offer.imageUrl}" alt="" loading="lazy" />`
-          : ""
-      }
+      ${productThumbHtml(offer.imageUrl, "product-thumb thumb-lg")}
       <div>
         <p class="offer-title">${escapeHtml(offer.title || "")}</p>
         <p class="muted">${escapeHtml([offer.brand, offer.volume].filter(Boolean).join(" · "))}</p>
@@ -1024,9 +1089,7 @@ function offerCardHtml(o, idx, bestPrice = null) {
   const realIdx = findOfferIndex(o);
   const offerId = escapeHtml(String(o.id || ""));
   const best = isBestPrice(o, bestPrice);
-  const img = o.imageUrl
-    ? `<img src="${o.imageUrl}" alt="" loading="lazy" />`
-    : `<div style="width:72px;height:72px;border-radius:12px;background:#0b140f"></div>`;
+  const img = productThumbHtml(o.imageUrl);
   const valueBadge = o.valuePick
     ? `<span class="value-badge">Tahmin: uygun fiyat + sade etiket</span>`
     : "";
@@ -1091,6 +1154,7 @@ function paintTable(offers) {
             ? String(o.unitPriceValue)
             : "—";
       return `<tr class="${isBest ? "best-deal" : ""}" data-offer-id="${offerId}" data-detail-idx="${realIdx}">
+        <td class="td-thumb">${productThumbHtml(o.imageUrl, "product-thumb thumb-sm")}</td>
         <td class="td-title"><button type="button" class="linkish detail-link" data-offer-id="${offerId}" data-detail-idx="${realIdx}">${escapeHtml(o.title)}</button>${o.volume ? `<div class="muted tiny">${escapeHtml(o.volume)}</div>` : ""}${isBest ? `<div><span class="best-badge">En uygun</span></div>` : ""}
           <div class="score-bars compact table-scores" title="${escapeHtml(o.analysisNote || "Etiket taraması")}">
             ${scoreRow("Sağlık", o.healthScore)}
@@ -1111,6 +1175,7 @@ function paintTable(offers) {
   return `<div class="table-wrap"><table class="price-table">
     <thead>
       <tr>
+        <th></th>
         <th>Ürün</th>
         <th>Market / şube</th>
         <th>Fiyat</th>
@@ -1128,12 +1193,17 @@ function paintGrouped(groups) {
   return groups
     .map((g, gi) => {
       const best = g.bestPrice != null ? Number(g.bestPrice) : lowestPrice(g.offers);
+      const headImg =
+        g.imageUrl ||
+        (g.offers || []).map((o) => o.imageUrl).find(Boolean) ||
+        "";
       const rows = g.offers
         .map((o) => {
           const realIdx = findOfferIndex(o);
           const offerId = escapeHtml(String(o.id || ""));
           const isBest = isBestPrice(o, best);
           return `<div class="group-row ${isBest ? "best-deal" : ""}" data-offer-id="${offerId}" data-detail-idx="${realIdx}" role="button" tabindex="0">
+            ${productThumbHtml(o.imageUrl || headImg, "product-thumb thumb-sm")}
             <span class="market-badge"><i style="background:${o.marketColor}"></i>${escapeHtml(o.marketLabel)}</span>
             <span class="muted tiny">${o.depotName ? escapeHtml(o.depotName) : ""}${o.distanceKm != null ? ` · ${o.distanceKm} km` : ""}${isBest ? ` · En uygun` : ""}</span>
             <span class="group-price ${isBest ? "best" : ""}">${money(o.price)}</span>
@@ -1150,7 +1220,7 @@ function paintGrouped(groups) {
         .join("");
       return `<section class="product-group" style="animation-delay:${Math.min(gi * 0.03, 0.4)}s">
         <header class="group-head">
-          ${g.imageUrl ? `<img src="${g.imageUrl}" alt="" loading="lazy" />` : ""}
+          ${productThumbHtml(headImg)}
           <div>
             <h3>${escapeHtml(g.title || "")}</h3>
             <p class="muted">${escapeHtml([g.brand, g.volume].filter(Boolean).join(" · "))} · ${g.marketCount} market · en ucuz: ${escapeHtml(g.bestMarketLabel || "")} ${money(g.bestPrice)}</p>
@@ -1218,8 +1288,13 @@ function renderRobot(robot) {
       <span class="robot-badge">Kıyas robotu · öneri</span>
       <span class="robot-score">skor ${pick.score}</span>
     </div>
-    <p class="robot-title">${escapeHtml(o.title)}</p>
-    <p class="robot-summary">${escapeHtml(pick.summary || "")}</p>
+    <div class="robot-hero">
+      ${productThumbHtml(o.imageUrl)}
+      <div>
+        <p class="robot-title">${escapeHtml(o.title)}</p>
+        <p class="robot-summary">${escapeHtml(pick.summary || "")}</p>
+      </div>
+    </div>
     <div class="score-bars robot-bars" title="${escapeHtml(o.analysisNote || "Etiket metni taraması")}">
       ${scoreRow("Sağlık", pick.healthScore)}
       ${scoreRow("Fiyat", pick.economyScore)}
@@ -1321,6 +1396,7 @@ els.form.addEventListener("submit", async (e) => {
 
 // Yazarken otomatik arama yok — sadece Ara / kg seçimi / ilçe
 els.city?.addEventListener("change", () => {
+  saveSelectedCity(els.city.value);
   const q = lastCommittedQuery || "";
   if (q.length < 2) return;
   const vol = state.activeVolume !== "all" ? state.activeVolume : null;
@@ -1997,21 +2073,6 @@ els.downloadCartPdf?.addEventListener("click", () => {
 els.cartToggle?.addEventListener("click", () => openDrawer(true));
 els.closeCart?.addEventListener("click", () => openDrawer(false));
 els.scrim?.addEventListener("click", () => openDrawer(false));
-els.tabSearch?.addEventListener("click", () => {
-  openDrawer(false);
-  dismissKeyboard();
-  const q = (els.query?.value || "").trim();
-  if (q) {
-    // Alt menü Ara = Ara / Karşılaştır (yazma yerine odaklanmaz)
-    lastCommittedQuery = q;
-    state.activeVolume = "all";
-    runSearch(q);
-    return;
-  }
-  // Boşsa sadece üst sabit arama paneline kaydır — input’a focus yok
-  document.getElementById("searchDock")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
 els.tabCart?.addEventListener("click", () => openDrawer(true));
 els.clearCarts?.addEventListener("click", () => {
   state.carts = {};
@@ -2040,8 +2101,10 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "23",
+  build: "25",
 };
+window.__AGT_READY = true;
+hideBootBanner();
 
 boot().catch((err) => {
   console.error(err);
