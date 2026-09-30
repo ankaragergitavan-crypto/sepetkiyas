@@ -1,6 +1,6 @@
 /* AGT MARKET PWA — yüklü cihazlar deploy sonrası otomatik güncellenir */
-const CACHE = "agt-market-shell-v22";
-const BUILD = "22";
+const CACHE = "agt-market-shell-v23";
+const BUILD = "23";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

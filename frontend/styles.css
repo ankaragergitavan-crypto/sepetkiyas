@@ -271,7 +271,12 @@ main,
   color: #062015;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.72rem;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  padding: 0 0.1rem;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .brand-text {

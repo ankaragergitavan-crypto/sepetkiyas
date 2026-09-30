@@ -344,7 +344,7 @@ function registerPwa() {
   };
 
   navigator.serviceWorker
-    .register("/sw.js?v=22")
+    .register("/sw.js?v=23")
     .then((reg) => {
       bumpSw(reg);
       reg.addEventListener("updatefound", () => {
@@ -1242,10 +1242,15 @@ function renderRobot(robot) {
   `;
 }
 
-function renderOffers(payload) {
+function renderOffers(payload, meta = {}) {
   state.offers = mergeLocalPriceHistory(payload.offers || []);
   state.groups = payload.groups || [];
-  state.activeVolume = "all";
+  const vol =
+    meta.volume ||
+    payload.activeVolume ||
+    (meta.keepVolume ? state.activeVolume : null) ||
+    "all";
+  state.activeVolume = vol && vol !== "null" ? vol : "all";
   els.emptyState.hidden = true;
   els.resultsSection.hidden = false;
   els.resultsTitle.textContent = `“${payload.query}” sonuçları`;
@@ -1297,59 +1302,34 @@ els.quickQueries?.addEventListener("click", (e) => {
   if (!btn) return;
   const q = btn.dataset.q || btn.textContent || "";
   if (els.query) els.query.value = q;
-  clearTimeout(autoSearchTimer);
-  lastAutoKey = "";
+  lastCommittedQuery = String(q).trim();
+  state.activeVolume = "all";
   runSearch(q);
 });
 
-let autoSearchTimer = null;
-let lastAutoKey = "";
+let lastCommittedQuery = "";
 let searchInFlight = false;
-
-function autoSearchKey() {
-  return `${String(els.query?.value || "")
-    .trim()
-    .toLocaleLowerCase("tr")}|${els.city?.value || ""}`;
-}
-
-function scheduleAutoSearch({ immediate = false } = {}) {
-  clearTimeout(autoSearchTimer);
-  const kick = () => {
-    const q = String(els.query?.value || "").trim();
-    if (q.length < 2) return;
-    const key = autoSearchKey();
-    if (key === lastAutoKey) return;
-    if (searchInFlight) {
-      // Bitince tekrar dene
-      autoSearchTimer = setTimeout(kick, 350);
-      return;
-    }
-    lastAutoKey = key;
-    runSearch(q, { status: `Otomatik: ${q}`, auto: true });
-  };
-  if (immediate) kick();
-  else autoSearchTimer = setTimeout(kick, 650);
-}
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  clearTimeout(autoSearchTimer);
   dismissKeyboard();
-  lastAutoKey = autoSearchKey();
-  await runSearch(els.query.value.trim());
+  const q = els.query.value.trim();
+  lastCommittedQuery = q;
+  state.activeVolume = "all";
+  await runSearch(q);
 });
 
-els.query?.addEventListener("input", () => {
-  scheduleAutoSearch({ immediate: false });
-});
-
-els.query?.addEventListener("change", () => {
-  scheduleAutoSearch({ immediate: true });
-});
-
+// Yazarken otomatik arama yok — sadece Ara / kg seçimi / ilçe
 els.city?.addEventListener("change", () => {
-  // İlçe değişince aynı ürünü yeniden tara — tekrar Ara demeye gerek yok
-  scheduleAutoSearch({ immediate: true });
+  const q = lastCommittedQuery || "";
+  if (q.length < 2) return;
+  const vol = state.activeVolume !== "all" ? state.activeVolume : null;
+  runSearch(q, {
+    volume: vol,
+    keepVolume: true,
+    auto: true,
+    status: `Konum değişti · ${q}`,
+  });
 });
 
 els.query?.addEventListener("focus", () => {
@@ -1366,17 +1346,22 @@ async function runSearch(rawQuery, meta = {}) {
   const query = String(rawQuery || "").trim();
   if (!query) return;
   els.query.value = query;
+  if (!meta.volume && !meta.keepVolume) {
+    lastCommittedQuery = query;
+  }
   dismissKeyboard();
   const city = selectedCity();
   if (!city?.lat || !city?.lon) {
     setScanStatus("İlçe seçilemedi — sayfayı yenileyin.", false);
     return;
   }
+  const volume =
+    meta.volume && meta.volume !== "all" ? String(meta.volume) : null;
   searchInFlight = true;
-  lastAutoKey = autoSearchKey();
   els.searchBtn.disabled = true;
   els.searchBtn.textContent = meta.auto ? "…" : "Aranıyor…";
-  setScanStatus(meta.status || `Tüm marketlerde aranıyor: ${query}`);
+  const volNote = volume ? ` · ${volume}` : "";
+  setScanStatus(meta.status || `Tüm marketlerde aranıyor: ${query}${volNote}`);
   try {
     const res = await apiFetch("/api/search", {
       method: "POST",
@@ -1386,17 +1371,22 @@ async function runSearch(rawQuery, meta = {}) {
         latitude: city.lat,
         longitude: city.lon,
         distance: 12,
+        volume,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Arama başarısız");
     if (data.query && data.query !== query) {
       els.query.value = data.query;
-      lastAutoKey = autoSearchKey();
+      if (!volume) lastCommittedQuery = data.query;
     }
-    renderOffers(data);
+    renderOffers(data, {
+      volume: volume || "all",
+      keepVolume: Boolean(meta.keepVolume || volume),
+    });
     if (meta.note) setScanStatus(meta.note, false);
     else if (data.typoNote) setScanStatus(data.typoNote, false);
+    else if (volume) setScanStatus(`${query} · ${volume}`, false);
     else setScanStatus("", true);
     dismissKeyboard();
     const el = els.resultsSection;
@@ -1920,9 +1910,21 @@ els.robotCard?.addEventListener("click", (e) => {
 els.volumeRow?.addEventListener("click", (e) => {
   const btn = e.target.closest(".vol-chip");
   if (!btn) return;
-  state.activeVolume = btn.dataset.volume || "all";
+  const vol = btn.dataset.volume || "all";
+  state.activeVolume = vol;
   renderVolumeChips(state.volumeOptions);
-  paintOffers();
+  const q = lastCommittedQuery || String(els.query?.value || "").trim();
+  if (q.length < 2) {
+    paintOffers();
+    return;
+  }
+  // kg / hacim seçince otomatik yeniden ara (yazarken değil)
+  runSearch(q, {
+    volume: vol === "all" ? null : vol,
+    keepVolume: true,
+    auto: true,
+    status: vol === "all" ? `Tümü · ${q}` : `${q} · ${vol}`,
+  });
 });
 
 els.viewToggle?.addEventListener("click", (e) => {
@@ -2001,6 +2003,8 @@ els.tabSearch?.addEventListener("click", () => {
   const q = (els.query?.value || "").trim();
   if (q) {
     // Alt menü Ara = Ara / Karşılaştır (yazma yerine odaklanmaz)
+    lastCommittedQuery = q;
+    state.activeVolume = "all";
     runSearch(q);
     return;
   }
@@ -2036,7 +2040,7 @@ window.AGT = {
     if (btn) btn.click();
   },
   geo: () => autoSelectByGeolocation(true),
-  build: "22",
+  build: "23",
 };
 
 boot().catch((err) => {
